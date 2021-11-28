@@ -13,6 +13,12 @@ class Chains:
     height: int
     block: SealedBlock
 
+    def format_chain(self) -> str:
+        base = f"{self.block.header.block_hash.hex()}"
+        if self.parent is None:
+            return base
+        return f"{base}, {self.parent.format_chain()}"
+
 
 class StartupState(str, Enum):
     PEERING = "PEERING"
@@ -42,7 +48,9 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
 
     validate_result = validate_transactions(state.ledger, block)
     if not validate_result.valid:
-        ctx.warning(f"invalid transactions in block received: {validate_result.message}")
+        ctx.warning(
+            f"invalid transactions in block received: {validate_result.message}"
+        )
         return state
     new_ledger = validate_result.new_ledger
 

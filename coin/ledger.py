@@ -88,14 +88,22 @@ def update_ledger(
     assert transaction.is_coinbase or (transfer_needed == 0)
 
     for transaction_output in transaction.outputs:
-        new_balances[
-            transaction_output.recipient_public_key
-        ] = new_balances.get(transaction_output.recipient_public_key, 0) + transaction_output.value
+        new_balances[transaction_output.recipient_public_key] = (
+            new_balances.get(transaction_output.recipient_public_key, 0)
+            + transaction_output.value
+        )
 
-    return SuccessfulValidateResult(new_ledger=Ledger(
-        balances=FrozenDict(new_balances),
-        previous_transactions=FrozenDict({**dict(starting_ledger.previous_transactions), transaction.hash(): transaction}),
-    ))
+    return SuccessfulValidateResult(
+        new_ledger=Ledger(
+            balances=FrozenDict(new_balances),
+            previous_transactions=FrozenDict(
+                {
+                    **dict(starting_ledger.previous_transactions),
+                    transaction.hash(): transaction,
+                }
+            ),
+        )
+    )
 
 
 def validate_transactions(

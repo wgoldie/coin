@@ -4,6 +4,7 @@ import multiprocessing as mp
 from coin.node_context import NodeContext
 from coin.run_node import run_node
 from coin.messaging import Message
+from coin.node_state import State
 import traceback
 
 # ctx = mp.get_context('spawn')
@@ -32,6 +33,7 @@ class Process(ctx.Process):
 
 def simulate_two() -> None:
     queues: typing.List[mp.Queue[Message]] = [mp.Queue(), mp.Queue()]
+    result_queues: typing.List[mp.Queue[State]] = [mp.Queue(), mp.Queue()]
 
     processes = [
         Process(
@@ -40,6 +42,7 @@ def simulate_two() -> None:
                 "ctx": NodeContext(node_id=str(i)),
                 "messages_in": queues[(i + 1) % 2],
                 "messages_out": queues[i % 2],
+                "result_out": result_queues[i],
             },
         )
         for i in range(2)
@@ -47,7 +50,9 @@ def simulate_two() -> None:
 
     for process in processes:
         process.start()
-    for process in processes:
+    results = []
+    for i, process in enumerate(processes):
+        results.append(result_queues[i].get())
         process.join()
         if process.exception:
             print(process.exception)

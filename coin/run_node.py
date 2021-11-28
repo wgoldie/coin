@@ -39,6 +39,7 @@ def run_node(
     ctx: NodeContext,
     messages_in: "Queue[messaging.Message]",
     messages_out: "Queue[messaging.Message]",
+    result_out: "Queue[State]",
     *,
     MAX_TRIES: int = 10000,
     INIT_STARTUP_STATE: StartupState = StartupState.PEERING,
@@ -52,8 +53,8 @@ def run_node(
         ledger=Ledger(),
     )
     starting_nonces: typing.DefaultDict[OpenBlockHeader, int] = defaultdict(lambda: 0)
-    difficulty = 1
-    while state.best_head.height < 5:
+    difficulty = 2
+    while state.best_head.height < 4:
         message: typing.Optional[messaging.Message]
         try:
             message = messages_in.get(False, 1)
@@ -104,7 +105,4 @@ def run_node(
                 )
             else:
                 starting_nonces[next_block_header] += MAX_TRIES
-    import pprint; pprint.pprint(state.ledger.balances)
-
-if __name__ == "__main__":
-    run_node(ctx=NodeContext(node_id="a"), messages_in=Queue(), messages_out=Queue())
+    result_out.put(state)
