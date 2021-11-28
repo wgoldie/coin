@@ -1,4 +1,4 @@
 set -e
-mypy coin --strict
+mypy --config mypy.ini coin --strict
 black coin
 echo "Passed!"

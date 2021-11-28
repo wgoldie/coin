@@ -5,6 +5,7 @@ from coin.merkle import dfs
 from coin.block import SealedBlock
 from coin.transaction import Transaction
 from coin.node_context import NodeContext
+from ecdsa import VerifyingKey
 import typing
 
 
@@ -63,7 +64,12 @@ def update_ledger(
             total_available += starting_ledger.balances[pubkey]
             if pubkey not in keys_to_drain:
                 keys_to_drain.append(pubkey)
-            # TODO check signature
+            verifying_key = VerifyingKey.from_string(pubkey)
+            signature_valid = verifying_key.verify(
+                transaction_input.signature, transaction.hash_for_signature
+            )
+            if not signature_valid:
+                return FailedValidateResult(message="Bad transaction signature")
 
     total_transferred = 0
     for transaction_output in transaction.outputs:

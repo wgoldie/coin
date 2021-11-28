@@ -29,7 +29,7 @@ def make_reward_transaction(ctx: NodeContext) -> transaction.Transaction:
         outputs=(
             transaction.TransactionOutput(
                 value=1,
-                recipient_public_key=str.encode(ctx.node_id),
+                recipient_public_key=ctx.node_key.public_key.to_string(),
             ),
         ),
     )
@@ -53,7 +53,7 @@ def run_node(
         ledger=Ledger(),
     )
     starting_nonces: typing.DefaultDict[OpenBlockHeader, int] = defaultdict(lambda: 0)
-    difficulty = 2
+    difficulty = 1
     while state.best_head.height < 4:
         message: typing.Optional[messaging.Message]
         try:
