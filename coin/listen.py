@@ -161,12 +161,8 @@ def listen(
         )
 
     elif isinstance(message, messaging.BlockMessage):
-        if state.startup_state != StartupState.DATA:
-            log_wrong_state(ctx, message.message_type, state.startup_state)
-            return None
-
         if message.payload.block.header.block_hash in state.block_lookup:
-            ctx.info("Got block {block.header.block_hash} already in storage")
+            ctx.info(f"Got block {message.payload.block.header.block_hash} already in storage")
             return None
 
         return ListenResult(new_state=try_add_block(state, message.payload.block))

@@ -22,7 +22,7 @@ def find_block(
     if difficulty < 1:
         raise ValueError("Invalid difficulty", 0)
     target = b"0" * difficulty
-    ctx.info(f"searching for block with difficulty {difficulty}")
+    ctx.debug(f"searching for block with difficulty {difficulty}")
     for nonce in range(starting_nonce, starting_nonce + max_tries):
         block_hash = open_block_header.hash(nonce)
         if block_hash.startswith(target):
@@ -33,7 +33,7 @@ def find_block(
                 nonce=nonce,
                 block_hash=block_hash,
             )
-    ctx.info(
+    ctx.debug(
         f"failed to find block with {difficulty} in {max_tries} tries from nonce {starting_nonce}"
     )
     return None

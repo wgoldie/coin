@@ -7,9 +7,25 @@ from coin.node_state import State, Chains, StartupState, try_add_block
 from coin.genesis import GENESIS_BLOCK
 from coin.block import OpenBlockHeader, SealedBlock
 from coin.find_block import find_block
+from coin.transaction import Transaction, SignedTransaction
 import typing
 from collections import defaultdict
+from coin.merkle import LeafMerkleNode
 import queue
+
+def make_reward_transaction(ctx: NodeContext) -> SignedTransaction:
+    unsigned_reward_transaction = Transaction(
+        recipient_public_key=str.encode(ctx.node_id),
+        previous_transaction=b'',
+    )
+
+
+    return SignedTransaction(
+        recipient_public_key=unsigned_reward_transaction.recipient_public_key,
+        previous_transaction=unsigned_reward_transaction.previous_transaction,
+        hash_for_signature=unsigned_reward_transaction.compute_hash_for_signature(),
+        signature=b'abc',
+    )
 
 
 def run_node(
@@ -24,7 +40,7 @@ def run_node(
         startup_state=StartupState.PEERING,
     )
     starting_nonces: typing.DefaultDict[OpenBlockHeader, int] = defaultdict(lambda: 0)
-    difficulty = 2
+    difficulty = 1
     while state.best_head.height < 5:
         message: typing.Optional[messaging.Message]
         try:
@@ -46,9 +62,12 @@ def run_node(
             state = replace(state, startup_state=StartupState.CONNECTING)
 
         if state.startup_state == StartupState.SYNCED:
+            reward_transaction = make_reward_transaction(ctx)
+            transaction_tree = LeafMerkleNode(node_hash=reward_transaction.hash, height=1)
+
             next_block_header = OpenBlockHeader(
                 previous_block_hash=state.best_head.block.header.block_hash,
-                transaction_tree_hash=b"abc",
+                transaction_tree_hash=transaction_tree.node_hash,
             )
             sealed_header = find_block(
                 ctx,
@@ -57,19 +76,16 @@ def run_node(
                 starting_nonce=starting_nonces[next_block_header],
                 max_tries=MAX_TRIES,
             )
-            starting_nonces
 
             if sealed_header is not None:
-                state = try_add_block(state, SealedBlock(header=sealed_header))
+                new_block = SealedBlock(header=sealed_header)
+                state = try_add_block(state, new_block)
                 assert sealed_header.block_hash in state.block_lookup
-                # TODO broadcast block
+                messages_out.put(messaging.BlockMessage(
+                    payload=messaging.BlockMessage.Payload(block=new_block)
+                ))
             else:
                 starting_nonces[next_block_header] += MAX_TRIES
-   
-    head = state.best_head
-    for i in range(5):
-        print(head.block.header.previous_block_hash.hex(), head.block.header.block_hash.hex())
-        head = head.parent
 
 if __name__ == "__main__":
     run_node(ctx=NodeContext(node_id="a"), messages_in=Queue(), messages_out=Queue())

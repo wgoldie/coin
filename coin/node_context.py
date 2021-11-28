@@ -5,6 +5,7 @@ from enum import Enum
 class LogType(str, Enum):
     INFO = "INFO"
     WARNING = "WARNING"
+    DEBUG = "DEBUG"
 
 
 @dataclass
@@ -19,3 +20,7 @@ class NodeContext:
 
     def warning(self, message: str) -> None:
         self.print(LogType.WARNING, message)
+
+    def debug(self, message: str) -> None:
+        # self.print(LogType.DEBUG, message)
+        pass
