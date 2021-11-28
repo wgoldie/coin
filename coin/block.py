@@ -29,3 +29,8 @@ class OpenBlockHeader(BlockHeader):
 class SealedBlockHeader(BlockHeader):
     nonce: int
     block_hash: bytes
+
+
+@dataclass(frozen=True)
+class SealedBlock:
+    header: SealedBlockHeader
