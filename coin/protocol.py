@@ -7,6 +7,7 @@
 import typing
 from dataclasses import dataclass, replace, field
 from coin.block import SealedBlock
+from coin.node_context import NodeContext
 from enum import Enum
 
 
@@ -116,8 +117,9 @@ def find_inventory(head: Chains, header_hash: bytes) -> Chains:
     else:
         return None
 
+
 def accumulate_inventories(
-    head: Chains, stopping_hash: typing.Optional[bytes], *, MAX_INVENTORIES=500
+    head: Chains, stopping_hash: typing.Optional[bytes], *, MAX_INVENTORIES: int = 500
 ) -> typing.Tuple[bytes, ...]:
     inventories = []
     for i in range(MAX_INVENTORIES):
@@ -137,21 +139,20 @@ def accumulate_inventories(
 ## if no match is found it sends 500 starting from the genesis block
 ## repeat until self has the tip of peer's blockchain
 
+
 def try_add_block(state: State, block: SealedBlock) -> State:
     if block.header.previous_block_hash not in state.block_lookup:
         return replace(state, orphaned_blocks={*state.orphaned_blocks, block})
 
-    valid = block.validate() # TODO pass some slice of state here and validate transactions
+    valid = (
+        block.validate()
+    )  # TODO pass some slice of state here and validate transactions
     if not valid:
-        print('invalid block received')
+        print("invalid block received")
         return state
     parent_chains = state.block_lookup[block.header.block_hash]
     is_new_best_head = parent_chains.height >= state.best_head.height
-    chains = Chains(
-        parent=parent_chains,
-        block=block,
-        height=parent_chains.height+1
-    )
+    chains = Chains(parent=parent_chains, block=block, height=parent_chains.height + 1)
 
     new_orphans = set()
     newly_parented = None
@@ -165,7 +166,9 @@ def try_add_block(state: State, block: SealedBlock) -> State:
         state,
         block_lookup={**state.block_lookup, block.header.previous_block_hash: block},
         best_head=chains if is_new_best_head else state.best_head,
-        orphaned_blocks=new_orphans if newly_parented is not None else state.orphaned_blocks,
+        orphaned_blocks=new_orphans
+        if newly_parented is not None
+        else state.orphaned_blocks,
     )
     if newly_parented is not None:
         return try_add_block(state, newly_parented)
@@ -173,80 +176,119 @@ def try_add_block(state: State, block: SealedBlock) -> State:
         return new_state
 
 
+def log_wrong_state(
+    ctx: NodeContext, message_type: MessageType, actual_state: StartupState
+) -> None:
+    ctx.info(
+        f"Got {message_type.value} message while in {actual_state.value}, ignoring"
+    )
 
-def listen(state: State, message: Message) -> typing.Optional[ListenResult]:
+
+def listen(
+    ctx: NodeContext,
+    state: State,
+    message: Message,
+) -> typing.Optional[ListenResult]:
     if isinstance(message, VersionAckMessage):
 
-        if state.startup_state == StartupState.CONNECTING:
-            return ListenResult(
-                new_state=replace(state, startup_state=StartupState.INVENTORY),
-            )
-        else:
+        if state.startup_state != StartupState.CONNECTING:
+            log_wrong_state(ctx, message.message_type, state.startup_state)
             return None
-    elif isinstance(message, VersionMessage):
-        if state.startup_state == StartupState.SYNCED:
-            return ListenResult(responses=(VersionAckMessage(),))
-        else:
-            return None
-    elif isinstance(message, GetBlocksMessage):
-        if state.startup_state == StartupState.SYNCED:
-            for header_hash in message.payload.header_hashes:
-                shared_block = None
-                shared_block = find_inventory(state.best_head, header_hash)
-                if shared_block is not None:
-                    break
-            if shared_block is not None:
-                inventories = accumulate_inventories(shared_block, message.payload.stopping_hash)
-                return ListenResult(
-                    responses=(InventoryMessage(payload=InventoryMessage.Payload(header_hashes=inventories)),
-               ))
-            else:
-                print('Failed to find shared block')
-                return None
-        else:
-            return None
-    elif isinstance(message, InventoryMessage):
-        if state.startup_state == StartupState.INVENTORY:
-            needed_blocks = [
-                header_hash
-                for header_hash in message.payload.header_hashes
-                if header_hash not in state.block_lookup]
-            return ListenResult(
-                new_state=replace(state, startup_state=StartupState.DATA),
-                responses=(GetDataMessage(payload=GetDataMessage.Payload(objects_requested=tuple(needed_blocks))),),
-            )
-        else:
-            return None
-    elif isinstance(message, GetDataMessage):
-        if state.startup_state == StartupState.SYNCED:
-            blocks_to_send = []
-            for header_hash in message.payload.objects_requested:
-                block = state.block_lookup.get(header_hash)
-                if block is not None:
-                    blocks_to_send.append(block.block)
 
-            return ListenResult(
-                responses=(
-                    tuple(
-                        BlockMessage(payload=BlockMessage.Payload(block=block))
-                        for block in blocks_to_send
+        return ListenResult(
+            new_state=replace(state, startup_state=StartupState.INVENTORY),
+        )
+
+    elif isinstance(message, VersionMessage):
+
+        if state.startup_state != StartupState.SYNCED:
+            log_wrong_state(ctx, message.message_type, state.startup_state)
+            return None
+
+        return ListenResult(responses=(VersionAckMessage(),))
+
+    elif isinstance(message, GetBlocksMessage):
+
+        if state.startup_state != StartupState.SYNCED:
+            log_wrong_state(ctx, message.message_type, state.startup_state)
+            return None
+
+        for header_hash in message.payload.header_hashes:
+            shared_block = None
+            shared_block = find_inventory(state.best_head, header_hash)
+            if shared_block is not None:
+                break
+
+        if shared_block is None:
+            ctx.info("Failed to find shared block")
+            return None
+
+        inventories = accumulate_inventories(
+            shared_block, message.payload.stopping_hash
+        )
+
+        return ListenResult(
+            responses=(
+                InventoryMessage(
+                    payload=InventoryMessage.Payload(header_hashes=inventories)
+                ),
+            )
+        )
+
+    elif isinstance(message, InventoryMessage):
+
+        if state.startup_state != StartupState.INVENTORY:
+            log_wrong_state(ctx, message.message_type, state.startup_state)
+            return None
+
+        needed_blocks = [
+            header_hash
+            for header_hash in message.payload.header_hashes
+            if header_hash not in state.block_lookup
+        ]
+
+        return ListenResult(
+            new_state=replace(state, startup_state=StartupState.DATA),
+            responses=(
+                GetDataMessage(
+                    payload=GetDataMessage.Payload(
+                        objects_requested=tuple(needed_blocks)
                     )
+                ),
+            ),
+        )
+
+    elif isinstance(message, GetDataMessage):
+
+        if state.startup_state != StartupState.SYNCED:
+            log_wrong_state(ctx, message.message_type, state.startup_state)
+            return None
+
+        blocks_to_send = []
+        for header_hash in message.payload.objects_requested:
+            block = state.block_lookup.get(header_hash)
+            if block is not None:
+                blocks_to_send.append(block.block)
+
+        return ListenResult(
+            responses=(
+                tuple(
+                    BlockMessage(payload=BlockMessage.Payload(block=block))
+                    for block in blocks_to_send
                 )
             )
-        else:
-            return None
-        pass
+        )
+
     elif isinstance(message, BlockMessage):
-        if state.startup_state == StartupState.DATA:
-            if message.payload.block.header.block_hash in state.block_lookup:
-                return None
-
-            return ListenResult(
-                new_state=try_add_block(state, message.payload.block)
-            )
-
-        else:
+        if state.startup_state != StartupState.DATA:
+            log_wrong_state(ctx, message.message_type, state.startup_state)
             return None
-        pass
+
+        if message.payload.block.header.block_hash in state.block_lookup:
+            ctx.info("Got block {block.header.block_hash} already in storage")
+            return None
+
+        return ListenResult(new_state=try_add_block(state, message.payload.block))
+
     else:
         raise ValueError("Unhandled message type", message)

@@ -38,7 +38,8 @@ class SealedBlock:
         # TODO validate and hash transactions directly here
         open_header = OpenBlockHeader(
             transaction_tree_hash=self.header.transaction_tree_hash,
-            previous_block_hash=self.header.previous_block_hash)
+            previous_block_hash=self.header.previous_block_hash,
+        )
         if open_header.hash(nonce=self.header.nonce) == self.header.block_hash:
             return True
         else:
