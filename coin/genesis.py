@@ -22,4 +22,4 @@ GENESIS_BLOCK = block.SealedBlock(
     transaction_tree=GENESIS_TRANSACTION_TREE,
 )
 
-assert GENESIS_BLOCK.validate()
+assert GENESIS_BLOCK.validate_hashes()

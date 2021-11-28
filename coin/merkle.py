@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import cache
 import abc
 import typing
 from dataclasses import dataclass
@@ -57,6 +58,7 @@ class ChildMerkleNode(MerkleNode[P], typing.Generic[P]):
     parent_a: MerkleNode[P]
     parent_b: MerkleNode[P]
 
+    @cache
     def node_hash(self) -> bytes:
         return hash_byte_sets(self.parent_a.node_hash(), self.parent_b.node_hash())
 
@@ -69,7 +71,6 @@ class ChildMerkleNode(MerkleNode[P], typing.Generic[P]):
 
     @staticmethod
     def visit(node: MerkleNode[P]) -> typing.Iterable[MerkleNode[P]]:
-        print(node)
         if isinstance(node, ChildMerkleNode):
             return (node.parent_a, node.parent_b)
         return tuple()
@@ -81,16 +82,35 @@ class ChildMerkleNode(MerkleNode[P], typing.Generic[P]):
 def bfs(
     nodes: typing.Iterable[MerkleNode[P]],
     visit: typing.Callable[[MerkleNode[P]], typing.Iterable[MerkleNode[P]]],
-    visited: typing.Set[MerkleNode[P]],
+    visited: typing.Set[bytes],
 ) -> None:
     new_nodes: typing.List[MerkleNode[P]] = []
     for node in nodes:
-        if node in visited:
+        node_hash = node.node_hash()
+        if node_hash in visited:
             continue
-        visited.add(node)
+        visited.add(node_hash)
         new_nodes.extend(visit(node))
     if len(new_nodes) > 0:
         bfs(new_nodes, visit, visited)
+
+
+def dfs(
+    node: MerkleNode[P],
+) -> typing.Generator[MerkleNode[P], None, None]:
+    nodes = [node]
+    visited = set()
+    while len(nodes) > 0:
+        new_nodes: typing.List[MerkleNode[P]] = []
+        for node in nodes:
+            yield node
+            node_hash = node.node_hash()
+            if node_hash in visited:
+                return
+            visited.add(node_hash)
+
+            new_nodes.extend(ChildMerkleNode.visit(node))
+        nodes = new_nodes
 
 
 def build_merkle_tree(

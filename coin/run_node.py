@@ -7,6 +7,7 @@ from coin.node_state import State, Chains, StartupState, try_add_block
 from coin.genesis import GENESIS_BLOCK
 from coin.block import OpenBlockHeader, SealedBlock
 from coin.find_block import find_block
+from coin.ledger import Ledger
 import coin.transaction as transaction
 import typing
 from collections import defaultdict
@@ -47,6 +48,7 @@ def run_node(
         best_head=genesis_chains,
         block_lookup={GENESIS_BLOCK.header.block_hash: genesis_chains},
         startup_state=StartupState.PEERING,
+        ledger=Ledger(),
     )
     starting_nonces: typing.DefaultDict[OpenBlockHeader, int] = defaultdict(lambda: 0)
     difficulty = 1

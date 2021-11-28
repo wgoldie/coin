@@ -37,7 +37,7 @@ class SealedBlock:
     header: SealedBlockHeader
     transaction_tree: MerkleNode[Transaction]
 
-    def validate(self) -> bool:
+    def validate_hashes(self) -> bool:
         if not self.transaction_tree.node_hash() == self.header.transaction_tree_hash:
             return False
         open_header = OpenBlockHeader(

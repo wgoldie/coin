@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 import typing
 from coin.block import SealedBlock
+from coin.ledger import Ledger, validate_transactions
 
 
 @dataclass
@@ -25,6 +26,7 @@ class State:
     best_head: Chains
     block_lookup: typing.Dict[bytes, Chains]
     startup_state: StartupState
+    ledger: Ledger
     orphaned_blocks: typing.FrozenSet[SealedBlock] = frozenset()
 
 
@@ -32,12 +34,17 @@ def try_add_block(state: State, block: SealedBlock) -> State:
     if block.header.previous_block_hash not in state.block_lookup:
         return replace(state, orphaned_blocks={*state.orphaned_blocks, block})
 
-    valid = (
-        block.validate()
-    )  # TODO pass some slice of state here and validate transactions
-    if not valid:
-        print("invalid block received")
+    hashes_valid = block.validate_hashes()
+    if not hashes_valid:
+        print("invalid hashes in block received")
         return state
+
+    validate_result = validate_transactions(state.ledger, block)
+    if not validate_result.valid:
+        print("invalid transactions in block received")
+        return state
+    new_ledger = validate_result.new_ledger
+
     parent_chains = state.block_lookup[block.header.previous_block_hash]
     is_new_best_head = parent_chains.height >= state.best_head.height
     chains = Chains(parent=parent_chains, block=block, height=parent_chains.height + 1)
@@ -57,6 +64,7 @@ def try_add_block(state: State, block: SealedBlock) -> State:
         orphaned_blocks=frozenset(new_orphans)
         if newly_parented is not None
         else state.orphaned_blocks,
+        ledger=new_ledger,
     )
     if newly_parented is not None:
         return try_add_block(state, newly_parented)
