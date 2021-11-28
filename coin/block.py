@@ -3,7 +3,6 @@ import typing
 from dataclasses import dataclass
 from functools import cached_property
 import hashlib
-from coin.merkle import build_merkle_tree
 
 
 @dataclass(frozen=True)
@@ -34,3 +33,13 @@ class SealedBlockHeader(BlockHeader):
 @dataclass(frozen=True)
 class SealedBlock:
     header: SealedBlockHeader
+
+    def validate(self) -> bool:
+        # TODO validate and hash transactions directly here
+        open_header = OpenBlockHeader(
+            transaction_tree_hash=self.header.transaction_tree_hash,
+            previous_block_hash=self.header.previous_block_hash)
+        if open_header.hash(nonce=self.header.nonce) == self.header.block_hash:
+            return True
+        else:
+            return False
