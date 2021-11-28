@@ -12,7 +12,7 @@ class NodeContext:
     node_id: str
 
     def print(self, log_type: LogType, message: str) -> None:
-        print(f"({self.node_id})\t[{log_type.value}]\t{message}")
+        print(f"({self.node_id})\t[{log_type.value}]\t{message}", flush=True)
 
     def info(self, message: str) -> None:
         self.print(LogType.INFO, message)

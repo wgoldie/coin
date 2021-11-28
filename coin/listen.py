@@ -29,13 +29,17 @@ def find_inventory(head: Chains, header_hash: bytes) -> typing.Optional[Chains]:
 
 
 def accumulate_inventories(
-    head: Chains, stopping_hash: typing.Optional[bytes], *, MAX_INVENTORIES: int = 500
+    init_head: Chains, stopping_hash: typing.Optional[bytes], *, MAX_INVENTORIES: int = 500
 ) -> typing.Tuple[bytes, ...]:
     inventories = []
+    current_head: typing.Optional[Chains] = init_head
     for i in range(MAX_INVENTORIES):
-        if head.block.header.block_hash == stopping_hash:
+        if current_head is None:
             break
-        inventories.append(head.block.header.block_hash)
+        if current_head.block.header.block_hash == stopping_hash:
+            break
+        inventories.append(current_head.block.header.block_hash)
+        current_head = current_head.parent
     return tuple(inventories)
 
 
@@ -71,21 +75,19 @@ def listen(
 
         return ListenResult(
             new_state=replace(state, startup_state=StartupState.INVENTORY),
+            responses=(messaging.GetBlocksMessage(
+                payload=messaging.GetBlocksMessage.Payload(
+                    header_hashes=(state.best_head.block.header.block_hash,),
+                    stopping_hash=None
+                )),
+            ),
         )
 
     elif isinstance(message, messaging.VersionMessage):
 
-        if state.startup_state != StartupState.SYNCED:
-            log_wrong_state(ctx, message.message_type, state.startup_state)
-            return None
-
         return ListenResult(responses=(messaging.VersionAckMessage(),))
 
     elif isinstance(message, messaging.GetBlocksMessage):
-
-        if state.startup_state != StartupState.SYNCED:
-            log_wrong_state(ctx, message.message_type, state.startup_state)
-            return None
 
         for header_hash in message.payload.header_hashes:
             shared_block = None
@@ -122,25 +124,26 @@ def listen(
             for header_hash in message.payload.header_hashes
             if header_hash not in state.block_lookup
         ]
-
-        return ListenResult(
-            new_state=replace(state, startup_state=StartupState.DATA),
-            responses=(
-                messaging.GetDataMessage(
-                    payload=messaging.GetDataMessage.Payload(
-                        objects_requested=tuple(needed_blocks)
-                    )
+        if len(needed_blocks) == 0:
+            return ListenResult(
+                new_state=replace(state, startup_state=StartupState.SYNCED),
+            )
+        else:
+            return ListenResult(
+                new_state=replace(state, startup_state=StartupState.DATA),
+                responses=(
+                    messaging.GetDataMessage(
+                        payload=messaging.GetDataMessage.Payload(
+                            objects_requested=tuple(needed_blocks)
+                        )
+                    ),
                 ),
-            ),
-        )
+            )
 
     elif isinstance(message, messaging.GetDataMessage):
 
-        if state.startup_state != StartupState.SYNCED:
-            log_wrong_state(ctx, message.message_type, state.startup_state)
-            return None
-
         blocks_to_send = []
+        print(message, state)
         for header_hash in message.payload.objects_requested:
             block = state.block_lookup.get(header_hash)
             if block is not None:
