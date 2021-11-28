@@ -29,7 +29,10 @@ def find_inventory(head: Chains, header_hash: bytes) -> typing.Optional[Chains]:
 
 
 def accumulate_inventories(
-    init_head: Chains, stopping_hash: typing.Optional[bytes], *, MAX_INVENTORIES: int = 500
+    init_head: Chains,
+    stopping_hash: typing.Optional[bytes],
+    *,
+    MAX_INVENTORIES: int = 500,
 ) -> typing.Tuple[bytes, ...]:
     inventories = []
     current_head: typing.Optional[Chains] = init_head
@@ -75,11 +78,13 @@ def listen(
 
         return ListenResult(
             new_state=replace(state, startup_state=StartupState.INVENTORY),
-            responses=(messaging.GetBlocksMessage(
-                payload=messaging.GetBlocksMessage.Payload(
-                    header_hashes=(state.best_head.block.header.block_hash,),
-                    stopping_hash=None
-                )),
+            responses=(
+                messaging.GetBlocksMessage(
+                    payload=messaging.GetBlocksMessage.Payload(
+                        header_hashes=(state.best_head.block.header.block_hash,),
+                        stopping_hash=None,
+                    )
+                ),
             ),
         )
 
@@ -162,7 +167,9 @@ def listen(
 
     elif isinstance(message, messaging.BlockMessage):
         if message.payload.block.header.block_hash in state.block_lookup:
-            ctx.info(f"Got block {message.payload.block.header.block_hash} already in storage")
+            ctx.info(
+                f"Got block {message.payload.block.header.block_hash!r} already in storage"
+            )
             return None
 
         return ListenResult(new_state=try_add_block(state, message.payload.block))

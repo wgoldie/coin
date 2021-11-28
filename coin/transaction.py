@@ -6,24 +6,70 @@ from coin.util import hash_byte_sets
 
 
 @dataclass(frozen=True)
-class Transaction:
-    recipient_public_key: bytes
-    previous_transaction: bytes
+class TransactionOutpoint:
+    previous_transaction_hash: bytes
+    index: int
 
-    def compute_hash_for_signature(self) -> bytes:
-        return hash_byte_sets(self.recipient_public_key, self.previous_transaction)
+    @cached_property
+    def hash_parts(self) -> typing.Tuple[bytes, ...]:
+        return (
+            self.previous_transaction_hash,
+            bytes(self.index),
+        )
 
 
 @dataclass(frozen=True)
-class SignedTransaction(Transaction):
-    hash_for_signature: bytes
+class TransactionInput:
+    previous_transaction_outpoint: TransactionOutpoint
     signature: bytes
 
     @cached_property
-    def hash(self) -> bytes:
-        return hash_byte_sets(
+    def hash_parts(self) -> typing.Tuple[bytes, ...]:
+        return self.previous_transaction_outpoint.hash_parts + (self.signature,)
+
+
+@dataclass(frozen=True)
+class TransactionOutput:
+    value: int
+    recipient_public_key: bytes
+
+    @cached_property
+    def hash_parts(self) -> typing.Tuple[bytes, ...]:
+        return (
+            bytes(self.value),
             self.recipient_public_key,
-            self.previous_transaction,
-            self.hash_for_signature,
-            self.signature,
         )
+
+
+@dataclass(frozen=True)
+class Transaction:
+    inputs: typing.Tuple[TransactionInput]
+    outputs: typing.Tuple[TransactionOutput]
+
+    @property
+    def is_coinbase(self) -> bool:
+        return (
+            len(self.inputs) == 1
+            and self.inputs[0].previous_transaction_outpoint.previous_transaction_hash
+            == b""
+        )
+
+    @cached_property
+    def _inputs_hash_parts(self) -> typing.Tuple[bytes, ...]:
+        return tuple(
+            hash_part for input in self.inputs for hash_part in input.hash_parts
+        )
+
+    @cached_property
+    def _outputs_hash_parts(self) -> typing.Tuple[bytes, ...]:
+        return tuple(
+            hash_part for output in self.outputs for hash_part in output.hash_parts
+        )
+
+    @cached_property
+    def hash_for_signature(self) -> bytes:
+        return hash_byte_sets(*self._outputs_hash_parts)
+
+    @cached_property
+    def hash(self) -> bytes:
+        return hash_byte_sets(*(self._inputs_hash_parts + self._outputs_hash_parts))

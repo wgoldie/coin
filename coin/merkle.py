@@ -2,7 +2,7 @@ import abc
 import typing
 from dataclasses import dataclass
 from functools import cached_property
-from coin.transaction import SignedTransaction
+from coin.transaction import Transaction
 from coin.util import hash_byte_sets
 
 
@@ -72,7 +72,7 @@ def bfs(
 
 
 def build_merkle_tree(
-    transactions: typing.Iterable[SignedTransaction],
+    transactions: typing.Iterable[Transaction],
 ) -> typing.Optional[MerkleNode]:
     transactions_iter = iter(transactions)
     lhs_init = next(transactions_iter, None)
