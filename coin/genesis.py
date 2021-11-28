@@ -1,7 +1,10 @@
 import coin.block as block
+from coin.merkle import NullMerkleNode
+
+GENESIS_TRANSACTION_TREE = NullMerkleNode()
 
 GENESIS_HEADER = block.OpenBlockHeader(
-    transaction_tree_hash=b"",
+    transaction_tree_hash=GENESIS_TRANSACTION_TREE.node_hash(),
     previous_block_hash=b"",
 )
 
@@ -16,6 +19,7 @@ GENESIS_BLOCK = block.SealedBlock(
         nonce=GENESIS_NONCE,
         block_hash=GENESIS_HASH,
     ),
+    transaction_tree=GENESIS_TRANSACTION_TREE,
 )
 
 assert GENESIS_BLOCK.validate()

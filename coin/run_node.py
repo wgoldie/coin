@@ -74,13 +74,11 @@ def run_node(
 
         if state.startup_state == StartupState.SYNCED:
             reward_transaction = make_reward_transaction(ctx)
-            transaction_tree = LeafMerkleNode(
-                node_hash=reward_transaction.hash, height=1
-            )
+            transaction_tree = LeafMerkleNode(payload=reward_transaction, height=1)
 
             next_block_header = OpenBlockHeader(
                 previous_block_hash=state.best_head.block.header.block_hash,
-                transaction_tree_hash=transaction_tree.node_hash,
+                transaction_tree_hash=transaction_tree.node_hash(),
             )
             sealed_header = find_block(
                 ctx,
@@ -91,7 +89,9 @@ def run_node(
             )
 
             if sealed_header is not None:
-                new_block = SealedBlock(header=sealed_header)
+                new_block = SealedBlock(
+                    header=sealed_header, transaction_tree=transaction_tree
+                )
                 state = try_add_block(state, new_block)
                 assert sealed_header.block_hash in state.block_lookup
                 messages_out.put(

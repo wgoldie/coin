@@ -2,6 +2,8 @@ import abc
 import typing
 from dataclasses import dataclass
 from functools import cached_property
+from coin.transaction import Transaction
+from coin.merkle import MerkleNode
 import hashlib
 
 
@@ -33,9 +35,11 @@ class SealedBlockHeader(BlockHeader):
 @dataclass(frozen=True)
 class SealedBlock:
     header: SealedBlockHeader
+    transaction_tree: MerkleNode[Transaction]
 
     def validate(self) -> bool:
-        # TODO validate and hash transactions directly here
+        if not self.transaction_tree.node_hash() == self.header.transaction_tree_hash:
+            return False
         open_header = OpenBlockHeader(
             transaction_tree_hash=self.header.transaction_tree_hash,
             previous_block_hash=self.header.previous_block_hash,

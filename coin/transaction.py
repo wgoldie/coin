@@ -70,6 +70,5 @@ class Transaction:
     def hash_for_signature(self) -> bytes:
         return hash_byte_sets(*self._outputs_hash_parts)
 
-    @cached_property
     def hash(self) -> bytes:
         return hash_byte_sets(*(self._inputs_hash_parts + self._outputs_hash_parts))
