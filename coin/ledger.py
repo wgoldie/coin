@@ -1,8 +1,10 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from coin.util import FrozenDict
 from coin.merkle import dfs
 from coin.block import SealedBlock
 from coin.transaction import Transaction
+from coin.node_context import NodeContext
 import typing
 
 
@@ -44,7 +46,7 @@ def update_ledger(
 
     total_available = 0
     keys_to_drain = []
-    if not transaction.is_coinbase:
+    if transaction.is_coinbase:
         total_available = BLOCK_REWARD
     else:
         for transaction_input in transaction.inputs:
@@ -52,7 +54,7 @@ def update_ledger(
                 transaction_input.previous_transaction_outpoint.previous_transaction_hash
             )
             if previous_hash not in starting_ledger.previous_transactions:
-                return FailedValidateResult(message="Unknown prevous hash")
+                return FailedValidateResult(message="Unknown previous hash")
             previous_transaction = starting_ledger.previous_transactions[previous_hash]
             previous_outpoint = previous_transaction.outputs[
                 transaction_input.previous_transaction_outpoint.index
@@ -72,28 +74,34 @@ def update_ledger(
             message="Tried to transfer more than existing balance"
         )
 
-    new_ledger = starting_ledger.copy()
+    new_balances = dict(starting_ledger.balances)
 
     transfer_needed = total_transferred
     for key_to_drain in keys_to_drain:
-        drain = min(total_transferred, new_ledger.balances[key_to_drain])
-        new_ledger.balances[key_to_drain] -= drain
+        drain = min(total_transferred, new_balances[key_to_drain])
+        new_balances[key_to_drain] -= drain
         transfer_needed -= drain
         assert transfer_needed >= 0
-        assert new_ledger.balances[key_to_drain] >= 0
+        assert new_balances[key_to_drain] >= 0
         if transfer_needed == 0:
             break
-    assert transfer_needed == 0
+    assert transaction.is_coinbase or (transfer_needed == 0)
 
     for transaction_output in transaction.outputs:
-        new_ledger.balances[
+        new_balances[
             transaction_output.recipient_public_key
-        ] += transaction_output.value
+        ] = new_balances.get(transaction_output.recipient_public_key, 0) + transaction_output.value
 
-    return SuccessfulValidateResult(new_ledger=new_ledger)
+    return SuccessfulValidateResult(new_ledger=Ledger(
+        balances=FrozenDict(new_balances),
+        previous_transactions=FrozenDict({**dict(starting_ledger.previous_transactions), transaction.hash(): transaction}),
+    ))
 
 
-def validate_transactions(start_ledger: Ledger, block: SealedBlock) -> ValidateResult:
+def validate_transactions(
+    start_ledger: Ledger,
+    block: SealedBlock,
+) -> ValidateResult:
     ledger = start_ledger
     for i, node in enumerate(dfs(block.transaction_tree)):
         transaction = node.payload

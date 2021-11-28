@@ -41,13 +41,14 @@ def run_node(
     messages_out: "Queue[messaging.Message]",
     *,
     MAX_TRIES: int = 10000,
+    INIT_STARTUP_STATE: StartupState = StartupState.PEERING,
 ) -> None:
     ctx.info("start")
     genesis_chains = Chains(parent=None, height=1, block=GENESIS_BLOCK)
     state = State(
         best_head=genesis_chains,
         block_lookup={GENESIS_BLOCK.header.block_hash: genesis_chains},
-        startup_state=StartupState.PEERING,
+        startup_state=INIT_STARTUP_STATE,
         ledger=Ledger(),
     )
     starting_nonces: typing.DefaultDict[OpenBlockHeader, int] = defaultdict(lambda: 0)
@@ -94,7 +95,7 @@ def run_node(
                 new_block = SealedBlock(
                     header=sealed_header, transaction_tree=transaction_tree
                 )
-                state = try_add_block(state, new_block)
+                state = try_add_block(ctx, state, new_block)
                 assert sealed_header.block_hash in state.block_lookup
                 messages_out.put(
                     messaging.BlockMessage(
@@ -103,7 +104,7 @@ def run_node(
                 )
             else:
                 starting_nonces[next_block_header] += MAX_TRIES
-
+    import pprint; pprint.pprint(state.ledger.balances)
 
 if __name__ == "__main__":
     run_node(ctx=NodeContext(node_id="a"), messages_in=Queue(), messages_out=Queue())

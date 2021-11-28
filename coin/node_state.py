@@ -4,6 +4,7 @@ from enum import Enum
 import typing
 from coin.block import SealedBlock
 from coin.ledger import Ledger, validate_transactions
+from coin.node_context import NodeContext
 
 
 @dataclass
@@ -30,18 +31,18 @@ class State:
     orphaned_blocks: typing.FrozenSet[SealedBlock] = frozenset()
 
 
-def try_add_block(state: State, block: SealedBlock) -> State:
+def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
     if block.header.previous_block_hash not in state.block_lookup:
         return replace(state, orphaned_blocks={*state.orphaned_blocks, block})
 
     hashes_valid = block.validate_hashes()
     if not hashes_valid:
-        print("invalid hashes in block received")
+        ctx.warning("invalid hashes in block received")
         return state
 
     validate_result = validate_transactions(state.ledger, block)
     if not validate_result.valid:
-        print("invalid transactions in block received")
+        ctx.warning(f"invalid transactions in block received: {validate_result.message}")
         return state
     new_ledger = validate_result.new_ledger
 
@@ -67,6 +68,6 @@ def try_add_block(state: State, block: SealedBlock) -> State:
         ledger=new_ledger,
     )
     if newly_parented is not None:
-        return try_add_block(state, newly_parented)
+        return try_add_block(ctx, state, newly_parented)
     else:
         return new_state

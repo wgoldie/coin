@@ -172,7 +172,7 @@ def listen(
             )
             return None
 
-        return ListenResult(new_state=try_add_block(state, message.payload.block))
+        return ListenResult(new_state=try_add_block(ctx, state, message.payload.block))
 
     else:
         raise ValueError("Unhandled message type", message)
