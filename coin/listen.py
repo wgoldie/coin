@@ -10,7 +10,7 @@ from coin.block import SealedBlock
 from coin.node_context import NodeContext
 from enum import Enum
 import coin.messaging as messaging
-from coin.node import State, StartupState, Chains, try_add_block
+from coin.node_state import State, StartupState, Chains, try_add_block
 
 
 @dataclass(frozen=True)
