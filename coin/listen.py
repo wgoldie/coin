@@ -9,107 +9,17 @@ from dataclasses import dataclass, replace, field
 from coin.block import SealedBlock
 from coin.node_context import NodeContext
 from enum import Enum
-
-
-@dataclass
-class Chains:
-    parent: Chains
-    height: int
-    block: SealedBlock
-
-
-class MessageType(str, Enum):
-    VERSION = "VERSION"
-    VERSION_ACK = "VERSION_ACK"
-    GET_BLOCKS = "GET_BLOCKS"
-    INVENTORY = "INVENTORY"
-    GET_DATA = "GET_DATA"
-    BLOCK = "BLOCK"
-
-
-class Message:
-    message_type: MessageType
-
-
-@dataclass
-class VersionMessage(Message):
-    @dataclass
-    class Payload:
-        version: str
-
-    payload: Payload
-    message_type: typing.Literal[MessageType.VERSION] = MessageType.VERSION
-
-
-@dataclass
-class VersionAckMessage(Message):
-    message_type: typing.Literal[MessageType.VERSION_ACK] = MessageType.VERSION_ACK
-
-
-@dataclass
-class GetBlocksMessage(Message):
-    @dataclass
-    class Payload:
-        header_hashes: typing.Tuple[bytes]
-        stopping_hash: typing.Optional[bytes]
-
-    payload: Payload
-    message_type: typing.Literal[MessageType.GET_BLOCKS] = MessageType.GET_BLOCKS
-
-
-@dataclass
-class InventoryMessage(Message):
-    @dataclass
-    class Payload:
-        header_hashes: typing.Tuple[bytes, ...]
-
-    payload: Payload
-    message_type: typing.Literal[MessageType.INVENTORY] = MessageType.INVENTORY
-
-
-@dataclass
-class GetDataMessage(Message):
-    @dataclass
-    class Payload:
-        objects_requested: typing.Tuple[bytes, ...]
-
-    payload: Payload
-    message_type: typing.Literal[MessageType.GET_DATA] = MessageType.GET_DATA
-
-
-@dataclass
-class BlockMessage(Message):
-    @dataclass
-    class Payload:
-        block: SealedBlock
-
-    payload: Payload
-    message_type: typing.Literal[MessageType.BLOCK] = MessageType.BLOCK
-
-
-class StartupState(str, Enum):
-    PEERING = "PEERING"
-    CONNECTING = "CONNECTING"
-    INVENTORY = "INVENTORY"
-    DATA = "DATA"
-    SYNCED = "SYNCED"
-
-
-@dataclass(frozen=True)
-class State:
-    best_head: Chains
-    block_lookup: typing.Dict[bytes, Chains]
-    startup_state: StartupState
-    orphaned_blocks: typing.Set[SealedBlock]
+import coin.messaging as messaging
+from coin.node import State, StartupState, Chains, try_add_block
 
 
 @dataclass(frozen=True)
 class ListenResult:
     new_state: typing.Optional[State] = None
-    responses: typing.Tuple[Message, ...] = tuple()
+    responses: typing.Tuple[messaging.Message, ...] = tuple()
 
 
-def find_inventory(head: Chains, header_hash: bytes) -> Chains:
+def find_inventory(head: Chains, header_hash: bytes) -> typing.Optional[Chains]:
     if head.block.header.block_hash == header_hash:
         return head
     elif head.parent is not None:
@@ -140,44 +50,8 @@ def accumulate_inventories(
 ## repeat until self has the tip of peer's blockchain
 
 
-def try_add_block(state: State, block: SealedBlock) -> State:
-    if block.header.previous_block_hash not in state.block_lookup:
-        return replace(state, orphaned_blocks={*state.orphaned_blocks, block})
-
-    valid = (
-        block.validate()
-    )  # TODO pass some slice of state here and validate transactions
-    if not valid:
-        print("invalid block received")
-        return state
-    parent_chains = state.block_lookup[block.header.block_hash]
-    is_new_best_head = parent_chains.height >= state.best_head.height
-    chains = Chains(parent=parent_chains, block=block, height=parent_chains.height + 1)
-
-    new_orphans = set()
-    newly_parented = None
-    for orphan_block in state.orphaned_blocks:
-        if orphan_block.header.previous_block_hash == block.header.block_hash:
-            newly_parented = orphan_block
-        else:
-            new_orphans.add(orphan_block)
-
-    new_state = replace(
-        state,
-        block_lookup={**state.block_lookup, block.header.previous_block_hash: block},
-        best_head=chains if is_new_best_head else state.best_head,
-        orphaned_blocks=new_orphans
-        if newly_parented is not None
-        else state.orphaned_blocks,
-    )
-    if newly_parented is not None:
-        return try_add_block(state, newly_parented)
-    else:
-        return new_state
-
-
 def log_wrong_state(
-    ctx: NodeContext, message_type: MessageType, actual_state: StartupState
+    ctx: NodeContext, message_type: messaging.MessageType, actual_state: StartupState
 ) -> None:
     ctx.info(
         f"Got {message_type.value} message while in {actual_state.value}, ignoring"
@@ -187,9 +61,9 @@ def log_wrong_state(
 def listen(
     ctx: NodeContext,
     state: State,
-    message: Message,
+    message: messaging.Message,
 ) -> typing.Optional[ListenResult]:
-    if isinstance(message, VersionAckMessage):
+    if isinstance(message, messaging.VersionAckMessage):
 
         if state.startup_state != StartupState.CONNECTING:
             log_wrong_state(ctx, message.message_type, state.startup_state)
@@ -199,15 +73,15 @@ def listen(
             new_state=replace(state, startup_state=StartupState.INVENTORY),
         )
 
-    elif isinstance(message, VersionMessage):
+    elif isinstance(message, messaging.VersionMessage):
 
         if state.startup_state != StartupState.SYNCED:
             log_wrong_state(ctx, message.message_type, state.startup_state)
             return None
 
-        return ListenResult(responses=(VersionAckMessage(),))
+        return ListenResult(responses=(messaging.VersionAckMessage(),))
 
-    elif isinstance(message, GetBlocksMessage):
+    elif isinstance(message, messaging.GetBlocksMessage):
 
         if state.startup_state != StartupState.SYNCED:
             log_wrong_state(ctx, message.message_type, state.startup_state)
@@ -229,13 +103,15 @@ def listen(
 
         return ListenResult(
             responses=(
-                InventoryMessage(
-                    payload=InventoryMessage.Payload(header_hashes=inventories)
+                messaging.InventoryMessage(
+                    payload=messaging.InventoryMessage.Payload(
+                        header_hashes=inventories
+                    )
                 ),
             )
         )
 
-    elif isinstance(message, InventoryMessage):
+    elif isinstance(message, messaging.InventoryMessage):
 
         if state.startup_state != StartupState.INVENTORY:
             log_wrong_state(ctx, message.message_type, state.startup_state)
@@ -250,15 +126,15 @@ def listen(
         return ListenResult(
             new_state=replace(state, startup_state=StartupState.DATA),
             responses=(
-                GetDataMessage(
-                    payload=GetDataMessage.Payload(
+                messaging.GetDataMessage(
+                    payload=messaging.GetDataMessage.Payload(
                         objects_requested=tuple(needed_blocks)
                     )
                 ),
             ),
         )
 
-    elif isinstance(message, GetDataMessage):
+    elif isinstance(message, messaging.GetDataMessage):
 
         if state.startup_state != StartupState.SYNCED:
             log_wrong_state(ctx, message.message_type, state.startup_state)
@@ -273,13 +149,15 @@ def listen(
         return ListenResult(
             responses=(
                 tuple(
-                    BlockMessage(payload=BlockMessage.Payload(block=block))
+                    messaging.BlockMessage(
+                        payload=messaging.BlockMessage.Payload(block=block)
+                    )
                     for block in blocks_to_send
                 )
             )
         )
 
-    elif isinstance(message, BlockMessage):
+    elif isinstance(message, messaging.BlockMessage):
         if state.startup_state != StartupState.DATA:
             log_wrong_state(ctx, message.message_type, state.startup_state)
             return None
