@@ -3,7 +3,7 @@ from dataclasses import replace
 from multiprocessing import Queue
 import coin.messaging as messaging
 from coin.listen import listen
-from coin.node_state import State, Chains, StartupState, try_add_block
+from coin.node_state import State, Chains, StartupState, try_add_block, Mempool
 from coin.genesis import GENESIS_BLOCK
 from coin.block import OpenBlockHeader, SealedBlock
 from coin.find_block import find_block
@@ -11,28 +11,8 @@ from coin.ledger import Ledger
 import coin.transaction as transaction
 import typing
 from collections import defaultdict
-from coin.merkle import LeafMerkleNode
+from coin.merkle import LeafMerkleNode, MerkleForest
 import queue
-
-
-def make_reward_transaction(ctx: NodeContext) -> transaction.Transaction:
-    return transaction.Transaction(
-        inputs=(
-            transaction.TransactionInput(
-                previous_transaction_outpoint=transaction.TransactionOutpoint(
-                    previous_transaction_hash=b"",
-                    index=0,
-                ),
-                signature=b"",
-            ),
-        ),
-        outputs=(
-            transaction.TransactionOutput(
-                value=1,
-                recipient_public_key=ctx.node_key.public_key.to_string(),
-            ),
-        ),
-    )
 
 
 def run_node(
@@ -50,6 +30,16 @@ def run_node(
         best_head=genesis_chains,
         block_lookup={GENESIS_BLOCK.header.block_hash: genesis_chains},
         startup_state=INIT_STARTUP_STATE,
+        mempool=Mempool(
+            transactions=MerkleForest(
+                trees=(
+                    LeafMerkleNode(
+                        payload=transaction.make_reward_transaction(ctx), height=1
+                    ),
+                )
+            ),
+            ledger=Ledger(),
+        ),
         ledger=Ledger(),
     )
     starting_nonces: typing.DefaultDict[OpenBlockHeader, int] = defaultdict(lambda: 0)
@@ -77,9 +67,7 @@ def run_node(
             state = replace(state, startup_state=StartupState.CONNECTING)
 
         if state.startup_state == StartupState.SYNCED:
-            reward_transaction = make_reward_transaction(ctx)
-            transaction_tree = LeafMerkleNode(payload=reward_transaction, height=1)
-
+            transaction_tree = state.mempool.transactions.merge()
             next_block_header = OpenBlockHeader(
                 previous_block_hash=state.best_head.block.header.block_hash,
                 transaction_tree_hash=transaction_tree.node_hash(),

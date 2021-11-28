@@ -56,6 +56,8 @@ def simulate_two() -> None:
         process.join()
         if process.exception:
             print(process.exception)
+    for result in results:
+        print(result.ledger.balances)
 
 
 if __name__ == "__main__":

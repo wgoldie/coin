@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 import typing
 from coin.block import SealedBlock
+from coin.transaction import Transaction
 
 
 class MessageType(str, Enum):
@@ -11,6 +12,7 @@ class MessageType(str, Enum):
     INVENTORY = "INVENTORY"
     GET_DATA = "GET_DATA"
     BLOCK = "BLOCK"
+    TRANSACTION = "TRANSACTION"
 
 
 class Message:
@@ -71,3 +73,13 @@ class BlockMessage(Message):
 
     payload: Payload
     message_type: typing.Literal[MessageType.BLOCK] = MessageType.BLOCK
+
+
+@dataclass
+class TransactionMessage(Message):
+    @dataclass
+    class Payload:
+        transaction: Transaction
+
+    payload: Payload
+    message_type: typing.Literal[MessageType.TRANSACTION] = MessageType.TRANSACTION

@@ -10,7 +10,13 @@ from coin.block import SealedBlock
 from coin.node_context import NodeContext
 from enum import Enum
 import coin.messaging as messaging
-from coin.node_state import State, StartupState, Chains, try_add_block
+from coin.node_state import (
+    State,
+    StartupState,
+    Chains,
+    try_add_block,
+    try_add_transaction,
+)
 
 
 @dataclass(frozen=True)
@@ -174,5 +180,8 @@ def listen(
 
         return ListenResult(new_state=try_add_block(ctx, state, message.payload.block))
 
+    elif isinstance(message, messaging.TransactionMessage):
+        new_mempool = try_add_transaction(state.mempool, message.payload.transaction)
+        return ListenResult(new_state=replace(state, mempool=new_mempool))
     else:
         raise ValueError("Unhandled message type", message)

@@ -113,6 +113,33 @@ def dfs(
         nodes = new_nodes
 
 
+@dataclass(frozen=True)
+class MerkleForest(typing.Generic[P]):
+    trees: typing.Tuple[MerkleNode[P], ...]
+
+    def add_node(self, payload: P) -> MerkleForest[P]:
+        trees = list(self.trees)
+        new_leaf = LeafMerkleNode(height=0, payload=payload)
+        rhs_tree: MerkleNode[P] = new_leaf
+        for _ in range(1, len(trees) + 1):
+            if trees[-1].height == rhs_tree.height:
+                rhs_tree = ChildMerkleNode(parent_a=trees.pop(), parent_b=rhs_tree)
+            else:
+                break
+        trees.append(rhs_tree)
+        return MerkleForest(trees=tuple(trees))
+
+    @cache
+    def merge(self) -> MerkleNode[P]:
+        acc_tree = None
+        for i in range(len(self.trees)):
+            if acc_tree is not None:
+                acc_tree = ChildMerkleNode(parent_a=self.trees[-i], parent_b=acc_tree)
+            else:
+                acc_tree = self.trees[-i]
+        return acc_tree if acc_tree is not None else NullMerkleNode()
+
+
 def build_merkle_tree(
     items: typing.Iterable[P],
 ) -> typing.Optional[MerkleNode[P]]:
@@ -120,21 +147,9 @@ def build_merkle_tree(
     lhs_init = next(items_iter, None)
     if lhs_init is None:
         return None
-    lhs_trees: typing.List[MerkleNode[P]] = [LeafMerkleNode(height=0, payload=lhs_init)]
-    for item in items_iter:
-        new_leaf = LeafMerkleNode(height=0, payload=item)
-        rhs_tree: MerkleNode[P] = new_leaf
-        for _ in range(1, len(lhs_trees) + 1):
-            if lhs_trees[-1].height == rhs_tree.height:
-                rhs_tree = ChildMerkleNode(parent_a=lhs_trees.pop(), parent_b=rhs_tree)
-            else:
-                break
-        lhs_trees.append(rhs_tree)
 
-    acc_tree = None
-    for i in range(len(lhs_trees)):
-        if acc_tree is not None:
-            acc_tree = ChildMerkleNode(parent_a=lhs_trees[-i], parent_b=acc_tree)
-        else:
-            acc_tree = lhs_trees[-i]
-    return acc_tree
+    forest = MerkleForest(trees=(LeafMerkleNode(height=0, payload=lhs_init),))
+    for item in items_iter:
+        forest = forest.add_node(item)
+
+    return forest.merge()

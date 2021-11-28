@@ -5,6 +5,9 @@ import typing
 from coin.block import SealedBlock
 from coin.ledger import Ledger, validate_transactions
 from coin.node_context import NodeContext
+from coin.merkle import MerkleForest, dfs, MerkleNode, LeafMerkleNode
+from coin.transaction import Transaction, make_reward_transaction
+from coin.ledger import update_ledger
 
 
 @dataclass
@@ -28,12 +31,19 @@ class StartupState(str, Enum):
     SYNCED = "SYNCED"
 
 
+@dataclass
+class Mempool:
+    ledger: Ledger
+    transactions: MerkleForest[Transaction]
+
+
 @dataclass(frozen=True)
 class State:
     best_head: Chains
     block_lookup: typing.Dict[bytes, Chains]
     startup_state: StartupState
     ledger: Ledger
+    mempool: Mempool
     orphaned_blocks: typing.FrozenSet[SealedBlock] = frozenset()
 
 
@@ -66,6 +76,9 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
         else:
             new_orphans.add(orphan_block)
 
+    new_mempool = prune_transactions(
+        state.mempool, new_ledger, make_reward_transaction(ctx)
+    )
     new_state = replace(
         state,
         block_lookup={**state.block_lookup, block.header.block_hash: chains},
@@ -73,9 +86,39 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
         orphaned_blocks=frozenset(new_orphans)
         if newly_parented is not None
         else state.orphaned_blocks,
+        mempool=new_mempool,
         ledger=new_ledger,
     )
     if newly_parented is not None:
         return try_add_block(ctx, state, newly_parented)
     else:
         return new_state
+
+
+def try_add_transaction(mempool: Mempool, transaction: Transaction) -> Mempool:
+    result = update_ledger(mempool.ledger, transaction)
+    if not result.valid:
+        print("failed to add transaction to mempool")
+        return mempool
+    return Mempool(
+        ledger=result.new_ledger,
+        transactions=mempool.transactions.add_node(transaction),
+    )
+
+
+def prune_transactions(
+    old_mempool: Mempool,
+    ledger: Ledger,
+    init_transaction: Transaction,
+) -> Mempool:
+    assert init_transaction.is_coinbase
+    new_mempool = Mempool(
+        transactions=MerkleForest(
+            trees=(LeafMerkleNode(payload=init_transaction, height=1),)
+        ),
+        ledger=ledger,
+    )
+    for transaction in (node.payload for node in dfs(old_mempool.transactions.merge())):
+        if transaction.hash() not in ledger.previous_transactions:
+            new_mempool = try_add_transaction(new_mempool, transaction)
+    return new_mempool

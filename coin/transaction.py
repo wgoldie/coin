@@ -3,6 +3,7 @@ import typing
 from dataclasses import dataclass
 from functools import cached_property
 from coin.util import hash_byte_sets
+from coin.node_context import NodeContext
 
 
 @dataclass(frozen=True)
@@ -72,3 +73,23 @@ class Transaction:
 
     def hash(self) -> bytes:
         return hash_byte_sets(*(self._inputs_hash_parts + self._outputs_hash_parts))
+
+
+def make_reward_transaction(ctx: NodeContext) -> Transaction:
+    return Transaction(
+        inputs=(
+            TransactionInput(
+                previous_transaction_outpoint=TransactionOutpoint(
+                    previous_transaction_hash=b"",
+                    index=0,
+                ),
+                signature=b"",
+            ),
+        ),
+        outputs=(
+            TransactionOutput(
+                value=1,
+                recipient_public_key=ctx.node_key.public_key.to_string(),
+            ),
+        ),
+    )
