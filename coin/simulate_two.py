@@ -5,30 +5,8 @@ from coin.node_context import NodeContext
 from coin.run_node import run_node
 from coin.messaging import Message
 from coin.node_state import State
+from coin.process import Process
 import traceback
-
-# ctx = mp.get_context('spawn')
-ctx = mp
-
-
-class Process(ctx.Process):
-    _pconn, _cconn = mp.Pipe()
-
-    _exception: typing.Optional[Exception] = None
-
-    def run(self) -> None:
-        try:
-            ctx.Process.run(self)
-            self._cconn.send(None)
-        except Exception as e:
-            tb = traceback.format_exc()
-            self._cconn.send((e, tb))
-
-    @property
-    def exception(self) -> typing.Optional[Exception]:
-        if self._pconn.poll():
-            self._exception = self._pconn.recv()
-        return self._exception
 
 
 def simulate_two() -> None:

@@ -15,7 +15,7 @@ def find_block(
     open_block_header: OpenBlockHeader,
     difficulty: int,
     *,
-    # reporting_interval: int = 100,
+    reporting_interval: int = 10000,
     starting_nonce: int = 0,
     max_tries: int = int(1e10),
 ) -> typing.Optional[SealedBlockHeader]:
@@ -23,7 +23,7 @@ def find_block(
         raise ValueError("Invalid difficulty", 0)
     target = b"0" * difficulty
     ctx.debug(f"searching for block with difficulty {difficulty}")
-    for nonce in range(starting_nonce, starting_nonce + max_tries):
+    for i, nonce in enumerate(range(starting_nonce, starting_nonce + max_tries)):
         block_hash = open_block_header.hash(nonce)
         if block_hash.startswith(target):
             ctx.info(f"found block {block_hash!r}!")
@@ -33,6 +33,8 @@ def find_block(
                 nonce=nonce,
                 block_hash=block_hash,
             )
+        if i % reporting_interval == 0:
+            ctx.info(f'tried {reporting_interval} nonces')
     ctx.debug(
         f"failed to find block with {difficulty} in {max_tries} tries from nonce {starting_nonce}"
     )

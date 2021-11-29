@@ -154,7 +154,6 @@ def listen(
     elif isinstance(message, messaging.GetDataMessage):
 
         blocks_to_send = []
-        print(message, state)
         for header_hash in message.payload.objects_requested:
             block = state.block_lookup.get(header_hash)
             if block is not None:
