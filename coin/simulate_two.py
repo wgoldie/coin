@@ -1,6 +1,8 @@
 import typing
 import logging
 import multiprocessing as mp
+import queue
+from coin.multiprocessing import mp_ctx
 from coin.node_context import NodeContext
 from coin.run_node import run_node
 from coin.messaging import Message
@@ -10,8 +12,8 @@ import traceback
 
 
 def simulate_two() -> None:
-    queues: typing.List[mp.Queue[Message]] = [mp.Queue(), mp.Queue()]
-    result_queues: typing.List[mp.Queue[State]] = [mp.Queue(), mp.Queue()]
+    queues: typing.List[mp.Queue[Message]] = [mp_ctx.Queue(5), mp_ctx.Queue(5)]
+    result_queues: typing.List[mp.Queue[State]] = [mp_ctx.Queue(1), mp_ctx.Queue(1)]
 
     processes = [
         Process(
@@ -28,14 +30,21 @@ def simulate_two() -> None:
 
     for process in processes:
         process.start()
-    results = []
-    for i, process in enumerate(processes):
-        results.append(result_queues[i].get())
-        process.join()
-        if process.exception:
-            print(process.exception)
-    for result in results:
-        print(result.ledger.balances)
+
+    result = None
+    while result is None:
+        for i, process in enumerate(processes):
+            try:
+                result = result_queues[i].get(True, 0.2)
+                break
+            except queue.Empty:
+                pass
+            if process.exception:
+                print(process.exception, flush=True)
+                result = -1
+    for process in processes:
+        process.terminate()
+    print(result.ledger.balances, flush=True)
 
 
 if __name__ == "__main__":

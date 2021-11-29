@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import typing
 from multiprocessing import Queue
 from coin.multiprocessing import mp_ctx
@@ -21,7 +21,7 @@ def run_mining(
 ) -> None:
     while True:
         block = find_block(
-            ctx=config.ctx,
+            ctx=replace(config.ctx, node_id=f"{config.ctx.node_id}.m"),
             open_block_header=config.next_block.header,
             difficulty=config.difficulty,
         )

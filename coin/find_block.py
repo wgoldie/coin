@@ -15,14 +15,14 @@ def find_block(
     open_block_header: OpenBlockHeader,
     difficulty: int,
     *,
-    reporting_interval: int = 10000,
+    reporting_interval: int = int(1e4),
     starting_nonce: int = 0,
     max_tries: int = int(1e10),
 ) -> typing.Optional[SealedBlockHeader]:
     if difficulty < 1:
         raise ValueError("Invalid difficulty", 0)
     target = b"0" * difficulty
-    ctx.debug(f"searching for block with difficulty {difficulty}")
+    ctx.info(f"searching for block with difficulty {difficulty}")
     for i, nonce in enumerate(range(starting_nonce, starting_nonce + max_tries)):
         block_hash = open_block_header.hash(nonce)
         if block_hash.startswith(target):

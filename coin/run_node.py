@@ -33,7 +33,7 @@ M = typing.TypeVar("M")
 
 def receive_message(message_queue: Queue[M]) -> typing.Optional[M]:
     try:
-        return message_queue.get(True, 0.2)
+        return message_queue.get(True, 0.5)
     except queue.Empty:
         return None
 
@@ -65,26 +65,28 @@ def run_node(
         ),
         ledger=Ledger(),
     )
-    difficulty = 2
+    difficulty = 3
     mining_process = None
-    while state.best_head.height < 4:
-
+    while state.best_head.height < 3:
         message: typing.Optional[messaging.Message]
         message = receive_message(messages_in)
         if message is not None:
             ctx.info(f"recv { message }")
             result = listen(ctx, state, message)
+            ctx.info(f"done listening")
             if result is not None:
                 if result.new_state is not None:
                     if (
                         result.new_state.mempool != state.mempool
                         and mining_process is not None
                     ):
-                        mining_process.stop()
+                        mining_process.terminate()
                         mining_process = None
                     state = result.new_state
+                ctx.info("start sending")
                 for response in result.responses:
                     messages_out.put(response)
+            ctx.info("done message processing")
 
         if state.startup_state == StartupState.PEERING:
             message = messaging.VersionMessage(
@@ -95,6 +97,7 @@ def run_node(
             state = replace(state, startup_state=StartupState.CONNECTING)
 
         if state.startup_state == StartupState.SYNCED and mining_process is None:
+
             next_block = build_next_block(state)
             mining_process = MiningProcessHandle(
                 config=MiningProcessConfig(
@@ -118,4 +121,7 @@ def run_node(
                 messages_out.put(message)
                 mining_process.stop()
                 mining_process = None
+    if mining_process is not None:
+        mining_process.terminate()
     result_out.put(state)
+    ctx.info(f"done")
