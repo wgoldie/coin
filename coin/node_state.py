@@ -45,6 +45,7 @@ class State:
     ledger: Ledger
     mempool: Mempool
     orphaned_blocks: typing.FrozenSet[SealedBlock] = frozenset()
+    peers: typing.FrozenSet[str] = frozenset()
 
 
 def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:

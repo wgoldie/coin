@@ -15,6 +15,7 @@ from coin.ledger import Ledger
 import coin.transaction as transaction
 from coin.merkle import LeafMerkleNode, MerkleForest
 from coin.mining import MiningProcessHandle, MiningProcessConfig
+from coin.process import receive_queue_messages, send_queue_message
 
 
 def build_next_block(state: State) -> OpenBlock:
@@ -26,16 +27,6 @@ def build_next_block(state: State) -> OpenBlock:
         ),
         transaction_tree=transaction_tree,
     )
-
-
-M = typing.TypeVar("M")
-
-
-def receive_message(message_queue: Queue[M]) -> typing.Optional[M]:
-    try:
-        return message_queue.get(True, 1)
-    except queue.Empty:
-        return None
 
 
 def run_node(
@@ -69,9 +60,8 @@ def run_node(
     mining_process = None
     while state.best_head.height < 10:
         message: typing.Optional[messaging.Message]
-        message = receive_message(messages_in)
+        message = receive_queue_messages(ctx, messages_in)
         if message is not None:
-            ctx.info(f"recv { str(message) }")
             result = listen(ctx, state, message)
             if result is not None:
                 if result.new_state is not None:
@@ -83,14 +73,13 @@ def run_node(
                         mining_process = None
                     state = result.new_state
                 for response in result.responses:
-                    messages_out.put(response)
+                    send_queue_message(ctx, messages_out, response)
 
         if state.startup_state == StartupState.PEERING:
             message = messaging.VersionMessage(
                 payload=messaging.VersionMessage.Payload(version="0.0.0")
             )
             messages_out.put(message)
-            ctx.info(f"sent { str(message) }")
             state = replace(state, startup_state=StartupState.CONNECTING)
 
         if state.startup_state == StartupState.SYNCED and mining_process is None:
@@ -103,7 +92,7 @@ def run_node(
             )
 
         if mining_process is not None:
-            sealed_header = receive_message(mining_process.result_queue)
+            sealed_header = receive_queue_messages(ctx, mining_process.result_queue)
             if sealed_header is not None:
                 new_block = SealedBlock(
                     header=sealed_header,
@@ -114,11 +103,10 @@ def run_node(
                 message = messaging.BlockMessage(
                     payload=messaging.BlockMessage.Payload(block=new_block)
                 )
-                ctx.info(f"sent { str(message) }")
-                messages_out.put(message)
+                send_queue_message(ctx, messages_out, message)
                 mining_process.stop()
                 mining_process = None
     if mining_process is not None:
         mining_process.terminate()
-    result_out.put(state)
+    send_queue_message(ctx, result_out, state)
     ctx.info(f"done")

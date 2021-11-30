@@ -1,6 +1,26 @@
+from __future__ import annotations
 import typing
 import traceback
+import queue
 from coin.multiprocessing import mp_ctx
+from coin.node_context import NodeContext
+from multiprocessing import Queue
+
+M = typing.TypeVar("M")
+
+
+def receive_queue_messages(ctx: NodeContext, message_queue: Queue[M]) -> typing.Optional[M]:
+    try:
+        message = message_queue.get(True, 1)
+        ctx.info(f"recv {message}")
+        return message
+    except queue.Empty:
+        return None
+
+
+def send_queue_message(ctx: NodeContext, message_queue: Queue[M], message: M) -> None:
+    message_queue.put(message)
+    ctx.info(f"sent { str(message) }") 
 
 
 class Process(mp_ctx.Process):  # type: ignore
