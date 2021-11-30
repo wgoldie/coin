@@ -29,11 +29,27 @@ def build_next_block(state: State) -> OpenBlock:
     )
 
 
+def broadcast_message(
+    ctx: NodeContext,
+    messages_out: Queue[messaging.AddressedMessage],
+    peers: typing.Iterable[messaging.Address],
+    message: messaging.Message,
+) -> None:
+    for peer in peers:
+        addressed_message = messaging.AddressedMessage(
+            message=message,
+            recipient_address=peer,
+            sender_address=ctx.node_id,
+        )
+        send_queue_message(ctx, messages_out, addressed_message)
+
+
 def run_node(
     ctx: NodeContext,
-    messages_in: Queue[messaging.Message],
-    messages_out: Queue[messaging.Message],
+    messages_in: Queue[messaging.AddressedMessage],
+    messages_out: Queue[messaging.AddressedMessage],
     result_out: Queue[State],
+    init_peers: typing.Iterable[messaging.Address],
     *,
     MAX_TRIES: int = 10000,
     INIT_STARTUP_STATE: StartupState = StartupState.PEERING,
@@ -55,14 +71,15 @@ def run_node(
             ledger=Ledger(),
         ),
         ledger=Ledger(),
+        peers=frozenset(init_peers)
     )
     difficulty = 3
     mining_process = None
     while state.best_head.height < 10:
-        message: typing.Optional[messaging.Message]
+        message: typing.Optional[messaging.AddressedMessage]
         message = receive_queue_messages(ctx, messages_in)
         if message is not None:
-            result = listen(ctx, state, message)
+            result = listen(ctx, state, message.message)
             if result is not None:
                 if result.new_state is not None:
                     if (
@@ -73,13 +90,12 @@ def run_node(
                         mining_process = None
                     state = result.new_state
                 for response in result.responses:
-                    send_queue_message(ctx, messages_out, response)
+                    broadcast_message(ctx, messages_out, [message.sender_address], response)
 
         if state.startup_state == StartupState.PEERING:
-            message = messaging.VersionMessage(
+            broadcast_message(ctx, messages_out, state.peers, messaging.VersionMessage(
                 payload=messaging.VersionMessage.Payload(version="0.0.0")
-            )
-            messages_out.put(message)
+            ))
             state = replace(state, startup_state=StartupState.CONNECTING)
 
         if state.startup_state == StartupState.SYNCED and mining_process is None:
@@ -100,10 +116,9 @@ def run_node(
                 )
                 state = try_add_block(ctx, state, new_block)
                 assert sealed_header.block_hash in state.block_lookup
-                message = messaging.BlockMessage(
+                broadcast_message(ctx, messages_out, state.peers, messaging.BlockMessage(
                     payload=messaging.BlockMessage.Payload(block=new_block)
-                )
-                send_queue_message(ctx, messages_out, message)
+                ))
                 mining_process.stop()
                 mining_process = None
     if mining_process is not None:

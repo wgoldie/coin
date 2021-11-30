@@ -1,9 +1,17 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import typing
 from coin.block import SealedBlock
 from coin.transaction import Transaction
 
+Address = str
+
+@dataclass(frozen=True)
+class AddressedMessage:
+    sender_address: Address
+    recipient_address: Address
+    message: Message
 
 class MessageType(str, Enum):
     VERSION = "VERSION"

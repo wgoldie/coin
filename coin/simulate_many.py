@@ -12,38 +12,38 @@ import traceback
 
 
 def simulate_two() -> None:
-    queues: typing.List[mp.Queue[AddressedMessage]] = [mp_ctx.Queue(5), mp_ctx.Queue(5)]
     result_queues: typing.List[mp.Queue[State]] = [mp_ctx.Queue(1), mp_ctx.Queue(1)]
-
-    ids = ['a', 'b']
-    processes = [
-        Process(
+    processes = {}
+    messages_in = {}
+    messages_out = {}
+    result_out = {}
+    for pid in ['a', 'b', 'c', 'd', 'e']:
+        messages_in[pid] = mp_ctx.Queue()
+        messages_out[pid] = mp_ctx.Queue()
+        result_out[pid] = mp_ctx.Queue()
+        processes[pid] = Process(
             target=run_node,
             kwargs={
-                "ctx": NodeContext(node_id=ids[i]),
-                "messages_in": queues[(i + 1) % 2],
-                "messages_out": queues[i % 2],
-                "result_out": result_queues[i],
-                'init_peers': ids[(i + 1) % 2]
+                "ctx": NodeContext(node_id=pid),
+                "messages_in": messages_in[pid],
+                "messages_out": messages_out[pid],
+                "result_out": result_out[pid],
+                'init_peers': {'a'}
             },
         )
-        for i in range(2)
-    ]
 
-    for process in processes:
+    for process in processes.values():
         process.start()
 
     result = None
     while result is None:
-        for i, process in enumerate(processes):
+        for pid, out_queue in messages_out.items():
             try:
-                result = result_queues[i].get(True, 0.2)
-                break
+                message = out_queue.get(True, 0.2)
+                assert message.sender_address == pid
+                messages_in[message.recipient_address].put(message)
             except queue.Empty:
                 pass
-            if process.exception:
-                print(process.exception, flush=True)
-                result = -1
     for process in processes:
         process.terminate()
     print(result.ledger.balances, flush=True)

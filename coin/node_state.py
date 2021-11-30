@@ -8,6 +8,7 @@ from coin.node_context import NodeContext
 from coin.merkle import MerkleForest, dfs, MerkleNode, LeafMerkleNode
 from coin.transaction import Transaction, make_reward_transaction
 from coin.ledger import update_ledger
+from coin.messaging import Address
 
 
 @dataclass
@@ -45,7 +46,7 @@ class State:
     ledger: Ledger
     mempool: Mempool
     orphaned_blocks: typing.FrozenSet[SealedBlock] = frozenset()
-    peers: typing.FrozenSet[str] = frozenset()
+    peers: typing.FrozenSet[Address] = frozenset()
 
 
 def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
