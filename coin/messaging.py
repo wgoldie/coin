@@ -18,7 +18,6 @@ class MessageType(str, Enum):
 class Message:
     message_type: MessageType
 
-
 @dataclass
 class VersionMessage(Message):
     @dataclass

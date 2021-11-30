@@ -15,7 +15,7 @@ def find_block(
     open_block_header: OpenBlockHeader,
     difficulty: int,
     *,
-    reporting_interval: int = int(1e4),
+    reporting_interval: int = int(1e6),
     starting_nonce: int = 0,
     max_tries: int = int(1e10),
 ) -> typing.Optional[SealedBlockHeader]:

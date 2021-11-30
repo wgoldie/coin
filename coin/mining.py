@@ -19,6 +19,7 @@ class MiningProcessConfig:
 def run_mining(
     config: MiningProcessConfig, result_queue: Queue[SealedBlockHeader]
 ) -> None:
+    config.ctx.info('Mining process starting...')
     while True:
         block = find_block(
             ctx=replace(config.ctx, node_id=f"{config.ctx.node_id}.m"),
@@ -38,7 +39,7 @@ class MiningProcessHandle:
     terminated: bool = False
 
     def __post_init__(self) -> None:
-        self.config.ctx.info("Starting mining process...")
+        self.config.ctx.info("Spawning mining subprocess...")
         self.result_queue = mp_ctx.Queue(2)
         self.process = Process(
             target=run_mining,

@@ -118,7 +118,7 @@ def prune_transactions(
         ),
         ledger=ledger,
     )
-    for transaction in (node.payload for node in dfs(old_mempool.transactions.merge())):
-        if transaction.hash() not in ledger.previous_transactions:
+    for transaction in (node.payload for node in dfs(old_mempool.transactions.merge()) if isinstance(node, LeafMerkleNode)):
+        if transaction.hash() not in ledger.previous_transactions and not transaction.is_coinbase:
             new_mempool = try_add_transaction(new_mempool, transaction)
     return new_mempool

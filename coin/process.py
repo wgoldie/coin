@@ -14,6 +14,7 @@ class Process(mp_ctx.Process):  # type: ignore
             self._cconn.send(None)
         except Exception as e:
             tb = traceback.format_exc()
+            print(tb, flush=True)
             self._cconn.send((e, tb))
 
     @property

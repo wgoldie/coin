@@ -33,7 +33,7 @@ M = typing.TypeVar("M")
 
 def receive_message(message_queue: Queue[M]) -> typing.Optional[M]:
     try:
-        return message_queue.get(True, 0.5)
+        return message_queue.get(True, 1)
     except queue.Empty:
         return None
 
@@ -47,7 +47,7 @@ def run_node(
     MAX_TRIES: int = 10000,
     INIT_STARTUP_STATE: StartupState = StartupState.PEERING,
 ) -> None:
-    ctx.info("start")
+    ctx.info("starting node...")
     genesis_chains = Chains(parent=None, height=1, block=GENESIS_BLOCK)
     state = State(
         best_head=genesis_chains,
@@ -67,13 +67,12 @@ def run_node(
     )
     difficulty = 3
     mining_process = None
-    while state.best_head.height < 3:
+    while state.best_head.height < 10:
         message: typing.Optional[messaging.Message]
         message = receive_message(messages_in)
         if message is not None:
-            ctx.info(f"recv { message }")
+            ctx.info(f"recv { str(message) }")
             result = listen(ctx, state, message)
-            ctx.info(f"done listening")
             if result is not None:
                 if result.new_state is not None:
                     if (
@@ -83,17 +82,15 @@ def run_node(
                         mining_process.terminate()
                         mining_process = None
                     state = result.new_state
-                ctx.info("start sending")
                 for response in result.responses:
                     messages_out.put(response)
-            ctx.info("done message processing")
 
         if state.startup_state == StartupState.PEERING:
             message = messaging.VersionMessage(
                 payload=messaging.VersionMessage.Payload(version="0.0.0")
             )
             messages_out.put(message)
-            ctx.info(f"sent { message }")
+            ctx.info(f"sent { str(message) }")
             state = replace(state, startup_state=StartupState.CONNECTING)
 
         if state.startup_state == StartupState.SYNCED and mining_process is None:
@@ -117,7 +114,7 @@ def run_node(
                 message = messaging.BlockMessage(
                     payload=messaging.BlockMessage.Payload(block=new_block)
                 )
-                ctx.info(f"sent { message }")
+                ctx.info(f"sent { str(message) }")
                 messages_out.put(message)
                 mining_process.stop()
                 mining_process = None

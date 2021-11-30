@@ -3,6 +3,7 @@ import typing
 from dataclasses import dataclass, InitVar, field
 from enum import Enum
 from ecdsa import SigningKey, VerifyingKey
+from datetime import datetime
 
 
 class LogType(str, Enum):
@@ -38,8 +39,10 @@ class NodeContext:
     node_id: str
     init_private_key: InitVar[typing.Optional[str]] = None
     node_key: ECDSAKey = field(init=False)
+    startup_time: datetime = field(init=False)
 
     def __post_init__(self, private_key: typing.Optional[str] = None) -> None:
+        self.startup_time = datetime.now()
         assert not hasattr(self, "node_key")
         if private_key is not None:
             self.node_key = ECDSAKey.from_import(private_key)
@@ -48,7 +51,7 @@ class NodeContext:
             self.node_key = ECDSAKey.generate()
 
     def print(self, log_type: LogType, message: str) -> None:
-        print(f"({self.node_id})\t[{log_type.value}]\t{message}", flush=True)
+        print(f"({self.node_id})\t{datetime.now() - self.startup_time}\t[{log_type.value}]\t{message}", flush=True)
 
     def info(self, message: str) -> None:
         self.print(LogType.INFO, message)

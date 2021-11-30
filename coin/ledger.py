@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from coin.util import FrozenDict
-from coin.merkle import dfs
+from coin.merkle import dfs, LeafMerkleNode
 from coin.block import SealedBlock
 from coin.transaction import Transaction
 from coin.node_context import NodeContext
@@ -118,8 +118,14 @@ def validate_transactions(
 ) -> ValidateResult:
     ledger = start_ledger
     for i, node in enumerate(dfs(block.transaction_tree)):
+        if not isinstance(node, LeafMerkleNode):
+            continue
         transaction = node.payload
-        assert transaction.is_coinbase == (i == 0)
+        valid = transaction.is_coinbase == (i == 0)
+        if not valid:
+            print('i', i, transaction.is_coinbase)
+            print(transaction)
+            assert False
         result = update_ledger(ledger, transaction)
         if not result.valid:
             return result
