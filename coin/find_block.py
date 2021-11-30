@@ -26,7 +26,7 @@ def find_block(
     for i, nonce in enumerate(range(starting_nonce, starting_nonce + max_tries)):
         block_hash = open_block_header.hash(nonce)
         if block_hash.startswith(target):
-            ctx.info(f"found block {block_hash!r}!")
+            ctx.info(f"found block {block_hash.hex()}!")
             return SealedBlockHeader(
                 transaction_tree_hash=open_block_header.transaction_tree_hash,
                 previous_block_hash=open_block_header.previous_block_hash,
