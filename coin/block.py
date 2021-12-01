@@ -22,7 +22,7 @@ class OpenBlockHeader(BlockHeader):
             self.hasher.update(self.transaction_tree_hash)
             self.hasher.update(self.previous_block_hash)
         hasher = self.hasher.copy()
-        hasher.update(nonce.to_bytes(32, byteorder='big'))
+        hasher.update(nonce.to_bytes(32, byteorder="big"))
         return hasher.digest()
 
 
@@ -58,5 +58,5 @@ class SealedBlock(Block):
         else:
             return False
 
-    def __repr__(self):
-        return f'SealedBlock(block_hash={self.header.block_hash.hex()}, ...)'
+    def __repr__(self) -> str:
+        return f"SealedBlock(block_hash={self.header.block_hash.hex()}, ...)"

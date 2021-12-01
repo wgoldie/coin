@@ -16,6 +16,7 @@ class Chains:
     parent: typing.Optional[Chains]
     height: int
     block: SealedBlock
+    ledger: Ledger
 
     def format_chain(self) -> str:
         base = f"{self.block.header.block_hash.hex()}"
@@ -43,7 +44,6 @@ class State:
     best_head: Chains
     block_lookup: typing.Dict[bytes, Chains]
     startup_state: StartupState
-    ledger: Ledger
     mempool: Mempool
     orphaned_blocks: typing.FrozenSet[SealedBlock] = frozenset()
     peers: typing.FrozenSet[Address] = frozenset()
@@ -58,17 +58,20 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
         ctx.warning("invalid hashes in block received")
         return state
 
-    validate_result = validate_transactions(state.ledger, block)
+    parent_chains = state.block_lookup[block.header.previous_block_hash]
+    validate_result = validate_transactions(parent_chains.ledger, block)
     if not validate_result.valid:
         ctx.warning(
             f"invalid transactions in block received: {validate_result.message}"
         )
         return state
-    new_ledger = validate_result.new_ledger
 
-    parent_chains = state.block_lookup[block.header.previous_block_hash]
-    is_new_best_head = parent_chains.height >= state.best_head.height
-    chains = Chains(parent=parent_chains, block=block, height=parent_chains.height + 1)
+    chains = Chains(
+        parent=parent_chains,
+        block=block,
+        height=parent_chains.height + 1,
+        ledger=validate_result.new_ledger,
+    )
 
     new_orphans = set()
     newly_parented = None
@@ -78,18 +81,23 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
         else:
             new_orphans.add(orphan_block)
 
-    new_mempool = prune_transactions(
-        state.mempool, new_ledger, make_reward_transaction(ctx)
-    )
+    if chains.height > state.best_head.height:
+        new_mempool = prune_transactions(
+            state.mempool, chains.ledger, make_reward_transaction(ctx)
+        )
+        new_best_head = chains
+    else:
+        new_mempool = state.mempool
+        new_best_head = state.best_head
+
     new_state = replace(
         state,
         block_lookup={**state.block_lookup, block.header.block_hash: chains},
-        best_head=chains if is_new_best_head else state.best_head,
+        best_head=new_best_head,
         orphaned_blocks=frozenset(new_orphans)
         if newly_parented is not None
         else state.orphaned_blocks,
         mempool=new_mempool,
-        ledger=new_ledger,
     )
     if newly_parented is not None:
         return try_add_block(ctx, state, newly_parented)
@@ -120,7 +128,14 @@ def prune_transactions(
         ),
         ledger=ledger,
     )
-    for transaction in (node.payload for node in dfs(old_mempool.transactions.merge()) if isinstance(node, LeafMerkleNode)):
-        if transaction.hash() not in ledger.previous_transactions and not transaction.is_coinbase:
+    for transaction in (
+        node.payload
+        for node in dfs(old_mempool.transactions.merge())
+        if isinstance(node, LeafMerkleNode)
+    ):
+        if (
+            transaction.hash() not in ledger.previous_transactions
+            and not transaction.is_coinbase
+        ):
             new_mempool = try_add_transaction(new_mempool, transaction)
     return new_mempool

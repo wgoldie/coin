@@ -52,7 +52,10 @@ class NodeContext:
             self.private_key_dump = self.node_key.private_key.to_string()
 
     def print(self, log_type: LogType, message: str) -> None:
-        print(f"({self.node_id})\t{datetime.now() - self.startup_time}\t[{log_type.value}]\t{message}", flush=True)
+        print(
+            f"({self.node_id})\t{datetime.now() - self.startup_time}\t[{log_type.value}]\t{message}",
+            flush=True,
+        )
 
     def info(self, message: str) -> None:
         self.print(LogType.INFO, message)

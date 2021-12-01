@@ -15,7 +15,7 @@ class TransactionOutpoint:
     def hash_parts(self) -> typing.Tuple[bytes, ...]:
         return (
             self.previous_transaction_hash,
-            self.index.to_bytes(32, byteorder='big'),
+            self.index.to_bytes(32, byteorder="big"),
         )
 
 
@@ -37,7 +37,7 @@ class TransactionOutput:
     @cached_property
     def hash_parts(self) -> typing.Tuple[bytes, ...]:
         return (
-            self.value.to_bytes(32, byteorder='big'),
+            self.value.to_bytes(32, byteorder="big"),
             self.recipient_public_key,
         )
 

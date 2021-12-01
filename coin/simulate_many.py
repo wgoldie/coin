@@ -17,7 +17,8 @@ def simulate_two() -> None:
     messages_in = {}
     messages_out = {}
     result_out = {}
-    for pid in ['a', 'b', 'c', 'd', 'e']:
+    PIDS = ["a", "b", "c", "d", "e"]
+    for i, pid in enumerate(PIDS):
         messages_in[pid] = mp_ctx.Queue()
         messages_out[pid] = mp_ctx.Queue()
         result_out[pid] = mp_ctx.Queue()
@@ -28,7 +29,7 @@ def simulate_two() -> None:
                 "messages_in": messages_in[pid],
                 "messages_out": messages_out[pid],
                 "result_out": result_out[pid],
-                'init_peers': {'a'}
+                "init_peers": {PIDS[(i + 1) % len(PIDS)]},
             },
         )
 
@@ -37,6 +38,7 @@ def simulate_two() -> None:
 
     result = None
     while result is None:
+
         for pid, out_queue in messages_out.items():
             try:
                 message = out_queue.get(True, 0.2)
@@ -44,9 +46,18 @@ def simulate_two() -> None:
                 messages_in[message.recipient_address].put(message)
             except queue.Empty:
                 pass
+
+        for pid, result_queue in result_out.items():
+            try:
+                result = result_queue.get(False)
+                break
+            except queue.Empty:
+                pass
+
     for process in processes:
         process.terminate()
-    print(result.ledger.balances, flush=True)
+
+    print(result.best_head.ledger.balances, flush=True)
 
 
 if __name__ == "__main__":

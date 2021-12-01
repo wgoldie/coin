@@ -34,7 +34,7 @@ def find_block(
                 block_hash=block_hash,
             )
         if i % reporting_interval == 0:
-            ctx.info(f'tried {reporting_interval} nonces')
+            ctx.info(f"tried {reporting_interval} nonces")
     ctx.debug(
         f"failed to find block with {difficulty} in {max_tries} tries from nonce {starting_nonce}"
     )

@@ -7,11 +7,13 @@ from coin.transaction import Transaction
 
 Address = str
 
+
 @dataclass(frozen=True)
 class AddressedMessage:
     sender_address: Address
     recipient_address: Address
     message: Message
+
 
 class MessageType(str, Enum):
     VERSION = "VERSION"
@@ -21,10 +23,13 @@ class MessageType(str, Enum):
     GET_DATA = "GET_DATA"
     BLOCK = "BLOCK"
     TRANSACTION = "TRANSACTION"
+    GET_ADDR = "GET_ADDR"
+    ADDR = "ADDR"
 
 
 class Message:
     message_type: MessageType
+
 
 @dataclass
 class VersionMessage(Message):
@@ -90,3 +95,18 @@ class TransactionMessage(Message):
 
     payload: Payload
     message_type: typing.Literal[MessageType.TRANSACTION] = MessageType.TRANSACTION
+
+
+@dataclass
+class GetAddrMessage(Message):
+    message_type: typing.Literal[MessageType.GET_ADDR] = MessageType.GET_ADDR
+
+
+@dataclass
+class AddrMessage(Message):
+    @dataclass
+    class Payload:
+        addresses: typing.Tuple[Address, ...]
+
+    payload: Payload
+    message_type: typing.Literal[MessageType.ADDR] = MessageType.ADDR

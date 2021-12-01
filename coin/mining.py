@@ -19,7 +19,7 @@ class MiningProcessConfig:
 def run_mining(
     config: MiningProcessConfig, result_queue: Queue[SealedBlockHeader]
 ) -> None:
-    config.ctx.info('Mining process starting...')
+    config.ctx.info("Mining process starting...")
     while True:
         block = find_block(
             ctx=replace(config.ctx, node_id=f"{config.ctx.node_id}.m"),

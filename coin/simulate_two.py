@@ -15,7 +15,7 @@ def simulate_two() -> None:
     queues: typing.List[mp.Queue[AddressedMessage]] = [mp_ctx.Queue(5), mp_ctx.Queue(5)]
     result_queues: typing.List[mp.Queue[State]] = [mp_ctx.Queue(1), mp_ctx.Queue(1)]
 
-    ids = ['a', 'b']
+    ids = ["a", "b"]
     processes = [
         Process(
             target=run_node,
@@ -24,7 +24,7 @@ def simulate_two() -> None:
                 "messages_in": queues[(i + 1) % 2],
                 "messages_out": queues[i % 2],
                 "result_out": result_queues[i],
-                'init_peers': ids[(i + 1) % 2]
+                "init_peers": ids[(i + 1) % 2],
             },
         )
         for i in range(2)
@@ -43,10 +43,10 @@ def simulate_two() -> None:
                 pass
             if process.exception:
                 print(process.exception, flush=True)
-                result = -1
+                return
     for process in processes:
         process.terminate()
-    print(result.ledger.balances, flush=True)
+    print(result.best_head.ledger.balances, flush=True)
 
 
 if __name__ == "__main__":

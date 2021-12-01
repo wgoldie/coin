@@ -9,9 +9,11 @@ from multiprocessing import Queue
 M = typing.TypeVar("M")
 
 
-def receive_queue_messages(ctx: NodeContext, message_queue: Queue[M]) -> typing.Optional[M]:
+def receive_queue_messages(
+    ctx: NodeContext, message_queue: Queue[M]
+) -> typing.Optional[M]:
     try:
-        message = message_queue.get(True, 1)
+        message = message_queue.get(True, 0.1)
         ctx.info(f"recv {message}")
         return message
     except queue.Empty:
@@ -20,7 +22,7 @@ def receive_queue_messages(ctx: NodeContext, message_queue: Queue[M]) -> typing.
 
 def send_queue_message(ctx: NodeContext, message_queue: Queue[M], message: M) -> None:
     message_queue.put(message)
-    ctx.info(f"sent { str(message) }") 
+    ctx.info(f"sent { str(message) }")
 
 
 class Process(mp_ctx.Process):  # type: ignore

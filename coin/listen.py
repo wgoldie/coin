@@ -23,6 +23,7 @@ from coin.node_state import (
 class ListenResult:
     new_state: typing.Optional[State] = None
     responses: typing.Tuple[messaging.Message, ...] = tuple()
+    addressed: typing.Tuple[messaging.AddressedMessage, ...] = tuple()
 
 
 def find_inventory(head: Chains, header_hash: bytes) -> typing.Optional[Chains]:
@@ -91,6 +92,7 @@ def listen(
                         stopping_hash=None,
                     )
                 ),
+                messaging.GetAddrMessage(),
             ),
         )
 
@@ -182,5 +184,36 @@ def listen(
     elif isinstance(message, messaging.TransactionMessage):
         new_mempool = try_add_transaction(state.mempool, message.payload.transaction)
         return ListenResult(new_state=replace(state, mempool=new_mempool))
+    elif isinstance(message, messaging.GetAddrMessage):
+        return ListenResult(
+            responses=(
+                messaging.AddrMessage(
+                    payload=(
+                        messaging.AddrMessage.Payload(addresses=tuple(state.peers))
+                    )
+                ),
+            ),
+        )
+    elif isinstance(message, messaging.AddrMessage):
+        ctx.info(f"PEERS A: {message.payload}")
+        peers = set()
+        for new_peer in message.payload.addresses:
+            if new_peer not in state.peers and new_peer != ctx.node_id:
+                peers.add(new_peer)
+        if len(peers) == 0:
+            return ListenResult()
+        new_peers = {*state.peers, *peers}
+        ctx.info(f"PEERS: {new_peers}")
+        return ListenResult(
+            new_state=replace(state, peers=frozenset(new_peers)),
+            addressed=tuple(
+                messaging.AddressedMessage(
+                    message=messaging.GetAddrMessage(),
+                    sender_address=ctx.node_id,
+                    recipient_address=peer,
+                )
+                for peer in new_peers
+            ),
+        )
     else:
         raise ValueError("Unhandled message type", message)

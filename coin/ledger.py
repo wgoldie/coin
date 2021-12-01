@@ -123,7 +123,7 @@ def validate_transactions(
         transaction = node.payload
         valid = transaction.is_coinbase == (i == 0)
         if not valid:
-            print('i', i, transaction.is_coinbase)
+            print("i", i, transaction.is_coinbase)
             print(transaction)
             assert False
         result = update_ledger(ledger, transaction)
