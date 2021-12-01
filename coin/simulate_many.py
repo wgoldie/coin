@@ -1,18 +1,11 @@
-import typing
-import logging
-import multiprocessing as mp
 import queue
 from coin.multiprocessing import mp_ctx
 from coin.node_context import NodeContext
 from coin.run_node import run_node
-from coin.messaging import AddressedMessage
-from coin.node_state import State
 from coin.process import Process
-import traceback
 
 
-def simulate_two() -> None:
-    result_queues: typing.List[mp.Queue[State]] = [mp_ctx.Queue(1), mp_ctx.Queue(1)]
+def simulate_many() -> None:
     processes = {}
     messages_in = {}
     messages_out = {}
@@ -61,4 +54,4 @@ def simulate_two() -> None:
 
 
 if __name__ == "__main__":
-    simulate_two()
+    simulate_many()

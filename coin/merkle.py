@@ -27,9 +27,6 @@ class MerkleNode(abc.ABC, typing.Generic[P]):
     def __str__(self) -> str:
         return f"{self.height} {str(self.node_hash())}"
 
-    def print_children(self) -> str:
-        pass
-
 
 class NullMerkleNode(MerkleNode[typing.Any]):
     height: int = 0
@@ -74,9 +71,6 @@ class ChildMerkleNode(MerkleNode[P], typing.Generic[P]):
         if isinstance(node, ChildMerkleNode):
             return (node.parent_a, node.parent_b)
         return tuple()
-
-    def print(self) -> None:
-        bfs([self], ChildMerkleNode.visit, set())
 
 
 def bfs(

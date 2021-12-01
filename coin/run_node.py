@@ -2,15 +2,12 @@ from __future__ import annotations
 from dataclasses import replace
 from multiprocessing import Queue
 import typing
-import queue
-from collections import defaultdict
 from coin.node_context import NodeContext
 import coin.messaging as messaging
 from coin.listen import listen
 from coin.node_state import State, Chains, StartupState, try_add_block, Mempool
 from coin.genesis import GENESIS_BLOCK
 from coin.block import OpenBlock, OpenBlockHeader, SealedBlock
-from coin.find_block import find_block
 from coin.ledger import Ledger
 import coin.transaction as transaction
 from coin.merkle import LeafMerkleNode, MerkleForest
@@ -140,4 +137,4 @@ def run_node(
     if mining_process is not None:
         mining_process.terminate()
     send_queue_message(ctx, result_out, state)
-    ctx.info(f"done")
+    ctx.info("done")

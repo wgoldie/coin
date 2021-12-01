@@ -5,7 +5,7 @@ import typing
 from coin.block import SealedBlock
 from coin.ledger import Ledger, validate_transactions
 from coin.node_context import NodeContext
-from coin.merkle import MerkleForest, dfs, MerkleNode, LeafMerkleNode
+from coin.merkle import MerkleForest, dfs, LeafMerkleNode
 from coin.transaction import Transaction, make_reward_transaction
 from coin.ledger import update_ledger
 from coin.messaging import Address
@@ -83,7 +83,7 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
 
     if chains.height > state.best_head.height:
         new_mempool = prune_transactions(
-            state.mempool, chains.ledger, make_reward_transaction(ctx)
+            ctx, state.mempool, chains.ledger, make_reward_transaction(ctx)
         )
         new_best_head = chains
     else:
@@ -105,10 +105,12 @@ def try_add_block(ctx: NodeContext, state: State, block: SealedBlock) -> State:
         return new_state
 
 
-def try_add_transaction(mempool: Mempool, transaction: Transaction) -> Mempool:
+def try_add_transaction(
+    ctx: NodeContext, mempool: Mempool, transaction: Transaction
+) -> Mempool:
     result = update_ledger(mempool.ledger, transaction)
     if not result.valid:
-        print("failed to add transaction to mempool")
+        ctx.warning("failed to add transaction to mempool")
         return mempool
     return Mempool(
         ledger=result.new_ledger,
@@ -117,6 +119,7 @@ def try_add_transaction(mempool: Mempool, transaction: Transaction) -> Mempool:
 
 
 def prune_transactions(
+    ctx: NodeContext,
     old_mempool: Mempool,
     ledger: Ledger,
     init_transaction: Transaction,
@@ -137,5 +140,5 @@ def prune_transactions(
             transaction.hash() not in ledger.previous_transactions
             and not transaction.is_coinbase
         ):
-            new_mempool = try_add_transaction(new_mempool, transaction)
+            new_mempool = try_add_transaction(ctx, new_mempool, transaction)
     return new_mempool

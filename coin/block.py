@@ -1,7 +1,5 @@
-import abc
 import typing
 from dataclasses import dataclass
-from functools import cached_property
 from coin.transaction import Transaction
 from coin.merkle import MerkleNode
 import hashlib

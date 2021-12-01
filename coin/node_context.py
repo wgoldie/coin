@@ -1,6 +1,6 @@
 from __future__ import annotations
 import typing
-from dataclasses import dataclass, InitVar, field
+from dataclasses import dataclass, field
 from enum import Enum
 from ecdsa import SigningKey, VerifyingKey
 from datetime import datetime

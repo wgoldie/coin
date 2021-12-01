@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, replace
-import typing
 from multiprocessing import Queue
 from coin.multiprocessing import mp_ctx
 from coin.process import Process, send_queue_message

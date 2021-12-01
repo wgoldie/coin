@@ -4,7 +4,6 @@ from coin.util import FrozenDict
 from coin.merkle import dfs, LeafMerkleNode
 from coin.block import SealedBlock
 from coin.transaction import Transaction
-from coin.node_context import NodeContext
 from ecdsa import VerifyingKey
 import typing
 
@@ -123,8 +122,6 @@ def validate_transactions(
         transaction = node.payload
         valid = transaction.is_coinbase == (i == 0)
         if not valid:
-            print("i", i, transaction.is_coinbase)
-            print(transaction)
             assert False
         result = update_ledger(ledger, transaction)
         if not result.valid:

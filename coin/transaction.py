@@ -1,4 +1,3 @@
-import abc
 import typing
 from dataclasses import dataclass
 from functools import cached_property

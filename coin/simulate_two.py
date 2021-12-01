@@ -1,5 +1,4 @@
 import typing
-import logging
 import multiprocessing as mp
 import queue
 from coin.multiprocessing import mp_ctx
@@ -8,7 +7,6 @@ from coin.run_node import run_node
 from coin.messaging import AddressedMessage
 from coin.node_state import State
 from coin.process import Process
-import traceback
 
 
 def simulate_two() -> None:

@@ -1,14 +1,6 @@
-# peering
-## upon startup, scan hardcoded addresses as well as a list of cached addresses from previous runs
-## open connections with those that respond in a timely manner
-## get further peer addresses from current peers
-## send out an online message every 30 min
-
 import typing
-from dataclasses import dataclass, replace, field
-from coin.block import SealedBlock
+from dataclasses import dataclass, replace
 from coin.node_context import NodeContext
-from enum import Enum
 import coin.messaging as messaging
 from coin.node_state import (
     State,
@@ -51,17 +43,6 @@ def accumulate_inventories(
         inventories.append(current_head.block.header.block_hash)
         current_head = current_head.parent
     return tuple(inventories)
-
-
-# block download
-## self chooses a peer and send getblocks with genesis block hash
-## peer sends back 500 block inventories (ids) start with the genesis block
-## self sends the peer getdata with 128 inventories starting just after the genesis block
-## peer sends 128 block messages with the requested blocks
-## self validates these blocks and sends another getblocks with list of 20 header hashes
-## peer checks its "best" (?) chain for each of these hashes, starting from the highest height, and sends back 500 blocks starting from the first matcha
-## if no match is found it sends 500 starting from the genesis block
-## repeat until self has the tip of peer's blockchain
 
 
 def log_wrong_state(
@@ -182,7 +163,9 @@ def listen(
         return ListenResult(new_state=try_add_block(ctx, state, message.payload.block))
 
     elif isinstance(message, messaging.TransactionMessage):
-        new_mempool = try_add_transaction(state.mempool, message.payload.transaction)
+        new_mempool = try_add_transaction(
+            ctx, state.mempool, message.payload.transaction
+        )
         return ListenResult(new_state=replace(state, mempool=new_mempool))
     elif isinstance(message, messaging.GetAddrMessage):
         return ListenResult(
